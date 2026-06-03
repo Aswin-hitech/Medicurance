@@ -1,0 +1,87 @@
+# ===============================
+# Environment Variables
+# ===============================
+.env
+.env.*
+!.env.example  # Keep example file if you have one
+
+# ===============================
+# Python
+# ===============================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.pkl
+
+# Virtual Environments
+venv/
+env/
+ENV/
+.venv/
+
+# Python packaging
+build/
+dist/
+*.egg-info/
+
+# Python testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# ===============================
+# Node
+# ===============================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Note: package.json SHOULD be committed (not in gitignore)
+
+# ===============================
+# IDE / Editor
+# ===============================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ===============================
+# OS Files
+# ===============================
+.DS_Store
+Thumbs.db
+
+# ===============================
+# Logs
+# ===============================
+logs/
+*.log
+
+# ===============================
+# Database / Local Storage
+# ===============================
+*.sqlite
+*.db
+
+# ===============================
+# Vector DB (RAG)
+# ===============================
+vectorstore/
+vectorstore/**/*  # Ensure all vectorstore contents are ignored
+
+# ===============================
+# Uploads / Temp Files
+# ===============================
+uploads/
+tmp/
+temp/

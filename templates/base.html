@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <title>{% block title %}MediCurance{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-container">
+            <a href="{{ url_for('auth.login') }}" class="navbar-brand">
+                <img src="{{ url_for('static', filename='assets/medicurance_logo.png') }}" alt="MediCurance" class="brand-logo" onerror="this.style.display='none'">
+                <span>
+                    MediCurance
+                    <small>Tamil Nadu Government Medical Reimbursement Portal</small>
+                </span>
+            </a>
+            <div class="navbar-menu">
+                {% if session.get('authenticated') %}
+                    {% if session.get('role') == 'admin' %}
+                        <a href="{{ url_for('admin.dashboard') }}" class="nav-link"><i class="fa-solid fa-shield-halved"></i> Admin</a>
+                        <a href="{{ url_for('admin.intelligence_dashboard') }}" class="nav-link"><i class="fa-solid fa-chart-line"></i> Insights</a>
+                    {% elif session.get('role') == 'officer' %}
+                        <a href="{{ url_for('officer.dashboard') }}" class="nav-link"><i class="fa-solid fa-clipboard-check"></i> Officer</a>
+                        <a href="{{ url_for('officer.profile') }}" class="nav-link"><i class="fa-solid fa-user-tie"></i> Profile</a>
+                    {% else %}
+                        <a href="{{ url_for('user.dashboard') }}" class="nav-link"><i class="fa-solid fa-house"></i> Home</a>
+                        <a href="{{ url_for('user.claim_request') }}" class="nav-link"><i class="fa-solid fa-file-circle-plus"></i> Claim</a>
+                        <a href="{{ url_for('user.claim_status') }}" class="nav-link"><i class="fa-solid fa-layer-group"></i> Status</a>
+                        <a href="{{ url_for('user.profile') }}" class="nav-link"><i class="fa-solid fa-user"></i> Profile</a>
+                    {% endif %}
+                    <a href="{{ url_for('auth.logout') }}" class="nav-pill"><i class="fa-solid fa-right-from-bracket"></i></a>
+                {% else %}
+                    <a href="{{ url_for('auth.login') }}" class="nav-link">Login</a>
+                    <a href="{{ url_for('auth.register_page') }}" class="nav-link">Register</a>
+                {% endif %}
+                <button type="button" class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+                    <i class="fa-solid fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="toast-stack" id="toastStack">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="toast toast-{{ category }} animate-in">
+                        <strong style="display:block; margin-bottom:0.25rem;">{{ category|title }}</strong>
+                        <div>{{ message }}</div>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+
+    <main class="page-shell">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <div class="page-shell">
+            <p>&copy; 2026 MediCurance | Tamil Nadu Government Medical Reimbursement Services</p>
+        </div>
+    </footer>
+
+    <script>
+        (function () {
+            const key = "medicurance_theme";
+            const saved = localStorage.getItem(key);
+            const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+            const theme = saved || (prefersDark ? "dark" : "light");
+            document.body.dataset.theme = theme;
+
+            const button = document.getElementById("themeToggle");
+            const icon = button ? button.querySelector("i") : null;
+            function sync() {
+                const dark = document.body.dataset.theme === "dark";
+                if (icon) icon.className = dark ? "fa-solid fa-sun" : "fa-solid fa-moon";
+            }
+            sync();
+            if (button) {
+                button.addEventListener("click", function () {
+                    document.body.dataset.theme = document.body.dataset.theme === "dark" ? "light" : "dark";
+                    localStorage.setItem(key, document.body.dataset.theme);
+                    sync();
+                });
+            }
+        })();
+
+        (function () {
+            const closeToast = (toast) => {
+                if (!toast) return;
+                toast.classList.add("toast-hide");
+                window.setTimeout(() => {
+                    if (toast && toast.parentNode) toast.parentNode.removeChild(toast);
+                }, 250);
+            };
+
+            document.querySelectorAll(".toast").forEach((toast) => {
+                window.setTimeout(() => closeToast(toast), 3000);
+            });
+        })();
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

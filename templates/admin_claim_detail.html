@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}Claim Detail | MediCurance{% endblock %}
+
+{% block content %}
+<div class="card animate-in">
+    <div class="toolbar" style="margin-bottom:1rem;">
+        <div>
+            <div class="chip"><i class="fa-solid fa-building-columns"></i> Administrative claim file</div>
+            <h1 style="margin-top:0.75rem;">Claim #{{ claim.claim_id[-8:] }}</h1>
+            <p class="muted">Reference: <strong>{{ claim.letter_reference }}</strong></p>
+        </div>
+        <div class="toolbar" style="justify-content:flex-end;">
+            <a href="{{ url_for('user.generate_letter', claim_id=claim.claim_id, letter_type='officer_to_beneficiary') }}" target="_blank" class="btn btn-secondary btn-sm"><i class="fa-solid fa-eye"></i> Preview Letter</a>
+            <a href="{{ url_for('user.generate_letter', claim_id=claim.claim_id, letter_type='officer_to_beneficiary', download=1) }}" class="btn btn-primary btn-sm"><i class="fa-solid fa-download"></i> Download PDF</a>
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary btn-sm">Back</a>
+        </div>
+    </div>
+
+    <div class="stats-row">
+        <div class="stat-card"><div class="muted">Trust Score</div><div class="stat-value">{{ claim.metrics.trust_score }}%</div></div>
+        <div class="stat-card"><div class="muted">Fraud Risk</div><div class="stat-value">{{ claim.metrics.fraud_level }}</div></div>
+        <div class="stat-card"><div class="muted">OCR Confidence</div><div class="stat-value">{{ claim.metrics.ocr_confidence }}%</div></div>
+        <div class="stat-card"><div class="muted">Duplicate Risk</div><div class="stat-value">{{ claim.metrics.duplicate_probability }}%</div></div>
+        <div class="stat-card"><div class="muted">Officer Decision</div><div class="stat-value" style="font-size:1.35rem;">{{ claim.metrics.officer_decision }}</div></div>
+        <div class="stat-card"><div class="muted">Reference Number</div><div class="stat-value" style="font-size:1.15rem;">{{ claim.metrics.reference_number }}</div></div>
+    </div>
+
+    <div class="grid" style="grid-template-columns: 1.2fr 0.8fr; margin-top:1rem;">
+        <div class="card">
+            <h3 class="gov-section-title"><i class="fa-solid fa-route"></i> Claim Timeline</h3>
+            <div class="timeline">
+                {% for item in claim.timeline %}
+                <div class="timeline-item {{ item.state }}">
+                    <div class="timeline-icon"><i class="fa-solid {{ item.icon }}"></i></div>
+                    <div>
+                        <strong>{{ item.label }}</strong>
+                        <p class="muted">{{ item.detail }}</p>
+                        {% if item.timestamp %}<small class="muted">{{ item.timestamp }}</small>{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="card info-list">
+            <h3 class="gov-section-title"><i class="fa-solid fa-id-card"></i> Claim Record</h3>
+            <p><strong>Beneficiary:</strong> {{ claim.name }}</p>
+            <p><strong>Mobile:</strong> {{ claim.mobile }}</p>
+            <p><strong>Hospital:</strong> {{ claim.hospital }}</p>
+            <p><strong>Claim Amount:</strong> Rs. {{ "%.2f"|format(claim.amount|float) }}</p>
+            <p><strong>Hospital Verification:</strong> {{ claim.metrics.hospital_verification }}</p>
+            <p><strong>Government Verification:</strong> {{ claim.metrics.government_verification }}</p>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:1rem;">
+        <h3 class="gov-section-title"><i class="fa-solid fa-scale-balanced"></i> Government Rule Verification</h3>
+        {% set rag = claim.rag_result or {} %}
+        {% set rag_status = rag.status or ('Eligible' if rag.eligible else 'Not Eligible') %}
+        <div class="analysis-panel">
+            <div class="analysis-card">
+                <strong>Eligibility Status</strong>
+                <p><span class="chip status-chip-{{ rag_status|lower|replace(' ', '') }}">{{ rag_status }}</span></p>
+            </div>
+            <div class="analysis-card">
+                <strong>Source</strong>
+                <p>{{ rag.source_document or 'Annexure I / Annexure IA' }}</p>
+            </div>
+            <div class="analysis-card">
+                <strong>Similarity</strong>
+                <p>{{ rag.similarity_score or 0 }}%</p>
+            </div>
+        </div>
+        <p><strong>Matched Rule:</strong> {{ rag.matched_rule or 'No rule match stored yet.' }}</p>
+        <p class="muted"><strong>LLM Explanation:</strong> {{ rag.llm_explanation or 'Government rule explanation not available.' }}</p>
+    </div>
+
+    <div class="card" style="margin-top:1rem;">
+        <h3 class="gov-section-title"><i class="fa-solid fa-brain"></i> Unified AI Decision Support</h3>
+        <div class="analysis-panel">
+            <div class="analysis-card"><strong>OCR Summary</strong><p>{{ claim.entities.summary if claim.entities and claim.entities.summary else 'OCR text extracted and stored with claim.' }}</p></div>
+            <div class="analysis-card"><strong>Fraud Analysis</strong><p>{{ claim.fraud_result.fraud_level if claim.fraud_result else claim.metrics.fraud_level }}</p></div>
+            <div class="analysis-card"><strong>Duplicate Analysis</strong><p>{{ claim.metrics.duplicate_probability }}% duplicate probability.</p></div>
+            <div class="analysis-card"><strong>Trust Score</strong><p>{{ claim.metrics.trust_score }}% / {{ claim.metrics.trust_level }}</p></div>
+            <div class="analysis-card"><strong>User Remarks</strong><p>{{ claim.officer_note or 'No citizen remarks submitted.' }}</p></div>
+            <div class="analysis-card"><strong>Officer Remarks</strong><p>{{ claim.officer_notes or claim.officer_comments or claim.rejection_reason or 'No officer remarks recorded.' }}</p></div>
+        </div>
+        <p style="margin-top:1rem;"><strong>LLM Recommendation:</strong> {{ claim.ai_result.recommended_action if claim.ai_result and claim.ai_result.recommended_action else 'Manual Review' }}</p>
+        <p class="muted">{{ claim.ai_reasoning_summary }}</p>
+    </div>
+
+    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-top:1rem;">
+        <div class="card">
+            <div class="toolbar" style="margin-bottom:0.75rem;">
+                <h3 class="gov-section-title" style="margin:0;"><i class="fa-solid fa-receipt"></i> Bill Preview</h3>
+                <a href="{{ claim.bill_url }}" target="_blank" class="btn btn-secondary btn-sm"><i class="fa-solid fa-up-right-from-square"></i> Fullscreen</a>
+            </div>
+            <div class="preview-box">
+                {% if claim.bill_url and claim.bill_url.lower().endswith('.pdf') %}
+                    <iframe src="{{ claim.bill_url }}" class="preview-frame"></iframe>
+                {% elif claim.bill_url %}
+                    <img src="{{ claim.bill_url }}" alt="Uploaded bill" style="width:100%; display:block;">
+                {% else %}
+                    <p class="muted" style="padding:1rem;">No bill file available.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="toolbar" style="margin-bottom:0.75rem;">
+                <h3 class="gov-section-title" style="margin:0;"><i class="fa-solid fa-file-signature"></i> Letter Preview</h3>
+                <a href="{{ url_for('user.generate_letter', claim_id=claim.claim_id, letter_type='officer_to_beneficiary') }}" target="_blank" class="btn btn-secondary btn-sm"><i class="fa-solid fa-up-right-from-square"></i> Fullscreen</a>
+            </div>
+            <div class="preview-box">
+                <iframe src="{{ url_for('user.generate_letter', claim_id=claim.claim_id, letter_type='officer_to_beneficiary') }}" class="preview-frame"></iframe>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

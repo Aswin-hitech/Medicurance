@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Officer Profile - MediCurance{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 800px; margin: 2rem auto;">
+    <div class="card-header" style="display: flex; align-items: center; gap: 1rem;">
+        <i class="fas fa-user-tie" style="font-size: 2rem; color: var(--primary-color);"></i>
+        <div>
+            <h2 style="margin: 0;">Officer Profile</h2>
+            <p class="text-muted" style="margin: 0;">Manage your official details</p>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+            <div class="card" style="padding: 1rem; text-align: center; background: rgba(11, 47, 92, 0.05); box-shadow: none; border: 1px solid var(--border-color);">
+                <h3 style="margin-bottom: 0.5rem; color: var(--primary-color);">{{ stats.reviewed }}</h3>
+                <p class="text-muted" style="font-size: 0.9rem;">Claims Reviewed</p>
+            </div>
+            <div class="card" style="padding: 1rem; text-align: center; background: rgba(11, 47, 92, 0.05); box-shadow: none; border: 1px solid var(--border-color);">
+                <h3 style="margin-bottom: 0.5rem; color: #28a745;">{{ stats.approved }}</h3>
+                <p class="text-muted" style="font-size: 0.9rem;">Claims Approved</p>
+            </div>
+            <div class="card" style="padding: 1rem; text-align: center; background: rgba(11, 47, 92, 0.05); box-shadow: none; border: 1px solid var(--border-color);">
+                <h3 style="margin-bottom: 0.5rem; color: #dc3545;">{{ stats.rejected }}</h3>
+                <p class="text-muted" style="font-size: 0.9rem;">Claims Rejected</p>
+            </div>
+            <div class="card" style="padding: 1rem; text-align: center; background: rgba(11, 47, 92, 0.05); box-shadow: none; border: 1px solid var(--border-color);">
+                <h3 style="margin-bottom: 0.5rem; color: #ffc107;">{{ stats.escalated }}</h3>
+                <p class="text-muted" style="font-size: 0.9rem;">Claims Escalated</p>
+            </div>
+        </div>
+
+        <form method="POST" action="#">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <h4 style="margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">Official Details</h4>
+            <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Officer ID</label>
+                    <input type="text" class="form-control" value="{{ officer.get('officer_id', '') }}" readonly disabled>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Employee ID</label>
+                    <input type="text" class="form-control" value="{{ officer.get('employee_id', '') }}" readonly disabled>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Full Name</label>
+                    <input type="text" name="name" class="form-control" value="{{ officer.get('name', '') }}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Department</label>
+                    <input type="text" class="form-control" value="{{ officer.get('department', '') }}" readonly disabled>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Designation</label>
+                    <input type="text" class="form-control" value="{{ officer.get('designation', '') }}" readonly disabled>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">District</label>
+                    <input type="text" class="form-control" value="{{ officer.get('district', '') }}" readonly disabled>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Joining Date</label>
+                    <input type="text" class="form-control" value="{{ officer.get('joining_date', officer.get('date_of_joining', '')) }}" readonly disabled>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <input type="text" class="form-control" value="{{ officer.get('status', 'Active') }}" readonly disabled>
+                </div>
+            </div>
+
+            <h4 style="margin-top: 2rem; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">Contact Information</h4>
+            <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Mobile Number</label>
+                    <input type="text" class="form-control" value="{{ officer.get('mobile', officer.get('phone', '')) }}" readonly disabled>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <input type="email" name="email" class="form-control" value="{{ officer.get('email', '') }}">
+                </div>
+            </div>
+
+            <div style="margin-top: 1.5rem; text-align: right;">
+                <button type="submit" class="btn btn-primary" onclick="alert('Profile update submitted (simulated)'); return false;">Update Profile</button>
+                <a href="{{ url_for('auth.forgot_password') }}" class="btn btn-secondary">Change Password</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

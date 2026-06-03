@@ -1,0 +1,50 @@
+﻿# Flask Core
+Flask==3.1.0
+Flask-WTF==1.2.1
+Werkzeug==3.1.3
+Jinja2==3.1.4
+
+# Database
+pymongo==4.13.1
+dnspython==2.7.0
+
+# Authentication + Security
+bcrypt==4.3.0
+python-dotenv==1.1.1
+Flask-Limiter==3.8.0
+
+# HTTP Requests
+requests==2.32.4
+
+# Supabase Storage
+supabase==2.18.1
+
+# OCR Pipeline
+pdfplumber==0.11.7
+pdf2image==1.17.0
+opencv-python==4.12.0.88
+Pillow==11.3.0
+numpy==2.2.6
+# Windows Poppler helper:
+# https://github.com/oschwartz10612/poppler-windows/releases
+
+# OCR.Space support
+pytesseract==0.3.13
+python-magic
+python-magic-bin
+
+# AI + RAG
+faiss-cpu==1.8.0.post1
+sentence-transformers==5.1.0
+transformers==4.55.4
+torch==2.8.0
+PyMuPDF==1.24.14
+
+# Data handling
+pandas==2.3.1
+
+# Production WSGI
+gunicorn==23.0.0
+
+# Logging / Utilities
+python-dateutil==2.9.0.post0

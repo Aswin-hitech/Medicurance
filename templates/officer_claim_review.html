@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}Claim Review | MediCurance{% endblock %}
+
+{% block content %}
+<div class="card animate-in">
+    <div class="toolbar" style="margin-bottom:1rem;">
+        <div>
+            <div class="chip"><i class="fa-solid fa-user-shield"></i> Officer review</div>
+            <h1 style="margin-top:0.75rem;">Claim #{{ claim.claim_id[-8:] }}</h1>
+            <p class="muted">Reference: <strong>{{ claim.letter_reference }}</strong></p>
+        </div>
+        <span class="badge badge-{{ claim.status.lower() }}">{{ claim.status }}</span>
+    </div>
+
+    <div class="stats-row">
+        <div class="stat-card"><div class="muted">Trust</div><div class="stat-value">{{ claim.metrics.trust_score }}%</div></div>
+        <div class="stat-card"><div class="muted">Fraud</div><div class="stat-value">{{ claim.metrics.fraud_level }}</div></div>
+        <div class="stat-card"><div class="muted">OCR</div><div class="stat-value">{{ claim.metrics.ocr_confidence }}%</div></div>
+        <div class="stat-card"><div class="muted">Rule Match</div><div class="stat-value">{{ claim.rag_result.similarity_score if claim.rag_result else 0 }}%</div></div>
+    </div>
+
+    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-top:1rem;">
+        <div class="card info-list">
+            <h3 class="gov-section-title"><i class="fa-solid fa-id-card"></i> Beneficiary and Treatment</h3>
+            <p><strong>Name:</strong> {{ claim.name }}</p>
+            <p><strong>Mobile:</strong> {{ claim.mobile|default('Registered') }}</p>
+            <p><strong>Hospital:</strong> {{ claim.hospital }}</p>
+            <p><strong>Claim Amount:</strong> Rs. {{ "%.2f"|format(claim.amount|float) }}</p>
+            <p><strong>Admission:</strong> {{ claim.entities.admission_date if claim.entities and claim.entities.admission_date else 'N/A' }}</p>
+            <p><strong>Discharge:</strong> {{ claim.entities.discharge_date if claim.entities and claim.entities.discharge_date else 'N/A' }}</p>
+            <p><strong>Invoice:</strong> {{ claim.entities.invoice_number if claim.entities and claim.entities.invoice_number else 'N/A' }}</p>
+        </div>
+
+        <div class="card">
+            <h3 class="gov-section-title"><i class="fa-solid fa-comment-dots"></i> Citizen Remarks</h3>
+            <p>{{ claim.officer_note or 'No additional remarks submitted by claimant.' }}</p>
+            <p class="muted"><strong>Submitted by:</strong> {{ claim.name }} {% if claim.citizen_remarks_submitted_at %}| {{ claim.citizen_remarks_submitted_at }}{% endif %}</p>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:1rem;">
+        <h3 class="gov-section-title"><i class="fa-solid fa-scale-balanced"></i> Government Rule Verification</h3>
+        {% set rag = claim.rag_result or {} %}
+        {% set rag_status = rag.status or ('Eligible' if rag.eligible else 'Not Eligible') %}
+        <div class="analysis-panel">
+            <div class="analysis-card"><strong>Eligibility</strong><p><span class="chip status-chip-{{ rag_status|lower|replace(' ', '') }}">{{ rag_status }}</span></p></div>
+            <div class="analysis-card"><strong>Source</strong><p>{{ rag.source_document or 'Annexure I / Annexure IA' }}</p></div>
+            <div class="analysis-card"><strong>Similarity</strong><p>{{ rag.similarity_score or 0 }}%</p></div>
+            <div class="analysis-card"><strong>Recommendation</strong><p>{{ claim.ai_result.recommended_action if claim.ai_result and claim.ai_result.recommended_action else 'Manual Review' }}</p></div>
+        </div>
+        <p><strong>Matched Rule:</strong> {{ rag.matched_rule or 'No rule match stored yet.' }}</p>
+        <p class="muted">{{ rag.llm_explanation or claim.ai_reasoning_summary }}</p>
+    </div>
+
+    <div class="card" style="margin-top:1rem;">
+        <h3 class="gov-section-title"><i class="fa-solid fa-brain"></i> AI Decision Support</h3>
+        <div class="analysis-panel">
+            <div class="analysis-card"><strong>OCR Summary</strong><p>{{ claim.entities.summary if claim.entities and claim.entities.summary else 'OCR completed for uploaded bill.' }}</p></div>
+            <div class="analysis-card"><strong>Fraud Analysis</strong><p>{{ claim.metrics.fraud_level }} risk, score {{ claim.metrics.fraud_score }}</p></div>
+            <div class="analysis-card"><strong>Duplicate Analysis</strong><p>{{ claim.metrics.duplicate_probability }}% duplicate probability.</p></div>
+            <div class="analysis-card"><strong>Hospital Verification</strong><p>{{ claim.metrics.hospital_verification }}</p></div>
+        </div>
+        <p class="muted" style="margin-top:1rem;">{{ claim.ai_reasoning_summary }}</p>
+    </div>
+
+    <div class="card" style="margin-top:1rem;">
+        <div class="toolbar" style="margin-bottom:0.75rem;">
+            <h3 class="gov-section-title" style="margin:0;"><i class="fa-solid fa-receipt"></i> Bill Preview</h3>
+            <a href="{{ claim.bill_url }}" target="_blank" class="btn btn-secondary btn-sm"><i class="fa-solid fa-up-right-from-square"></i> Fullscreen</a>
+        </div>
+        <div class="preview-box">
+            {% if claim.bill_url and claim.bill_url.lower().endswith('.pdf') %}
+                <iframe src="{{ claim.bill_url }}" class="preview-frame"></iframe>
+            {% elif claim.bill_url %}
+                <img src="{{ claim.bill_url }}" alt="Bill" style="width:100%; display:block;">
+            {% else %}
+                <p class="muted" style="padding:1rem;">No bill file available.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if claim.status == 'Pending' %}
+    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-top:1rem;">
+        <form action="{{ url_for('officer.approve', claim_id=claim.claim_id) }}" method="POST" class="card">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <h3 class="gov-section-title"><i class="fa-solid fa-circle-check"></i> Approve Claim</h3>
+            <div class="form-group">
+                <label class="form-label">Quick action remarks</label>
+                <select class="form-control" onchange="document.getElementById('approvalNotes').value=this.value">
+                    <option value="">Select preset</option>
+                    <option>Claim approved after successful verification.</option>
+                    <option>All required documents verified and approved.</option>
+                    <option>Eligible under applicable reimbursement rules.</option>
+                    <option>Approved subject to policy conditions.</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Sanctioned amount</label>
+                <input type="number" name="sanctioned_amount" class="form-control" value="{{ claim.amount }}" step="0.01" min="0">
+            </div>
+            <textarea id="approvalNotes" name="notes" class="form-control" rows="5" placeholder="Official approval remarks" required></textarea>
+            <button class="btn btn-primary w-100" type="submit" style="margin-top:0.75rem;"><i class="fa-solid fa-file-signature"></i> Approve and Generate Letter</button>
+        </form>
+
+        <form action="{{ url_for('officer.reject', claim_id=claim.claim_id) }}" method="POST" class="card">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <h3 class="gov-section-title"><i class="fa-solid fa-circle-xmark"></i> Reject Claim</h3>
+            <div class="form-group">
+                <label class="form-label">Reason</label>
+                <select name="reason" class="form-control" required>
+                    <option value="">Select reason</option>
+                    <option value="Invalid or incomplete document">Invalid or incomplete document</option>
+                    <option value="Duplicate claim detected">Duplicate claim detected</option>
+                    <option value="Procedure not covered under applicable rules">Procedure not covered under applicable rules</option>
+                    <option value="Benefit limit exceeded">Benefit limit exceeded</option>
+                    <option value="Government eligibility could not be verified">Government eligibility could not be verified</option>
+                </select>
+            </div>
+            <textarea name="comments" class="form-control" rows="5" placeholder="Detailed rejection comments and appeal guidance" required></textarea>
+            <button class="btn btn-danger w-100" type="submit" style="margin-top:0.75rem;"><i class="fa-solid fa-file-circle-xmark"></i> Reject and Generate Letter</button>
+        </form>
+    </div>
+    {% else %}
+    <div class="card" style="margin-top:1rem;">
+        <div class="toolbar">
+            <div>
+                <h3 class="gov-section-title"><i class="fa-solid fa-file-signature"></i> Generated Letter</h3>
+                <p class="muted">Reference: {{ claim.letter_reference }}</p>
+            </div>
+            <div class="toolbar" style="justify-content:flex-end;">
+                <a href="{{ url_for('user.generate_letter', claim_id=claim.claim_id, letter_type='officer_to_beneficiary') }}" target="_blank" class="btn btn-secondary btn-sm">Preview</a>
+                <a href="{{ url_for('user.generate_letter', claim_id=claim.claim_id, letter_type='officer_to_beneficiary', download=1) }}" class="btn btn-primary btn-sm">Download PDF</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

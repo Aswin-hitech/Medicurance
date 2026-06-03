@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Review Claim - MediCurance{% endblock %}
+
+{% block content %}
+<div class="glassy-card" style="max-width: 800px; margin: 2rem auto;">
+    <h2><i class="fas fa-clipboard-check"></i> Review Your Claim</h2>
+    
+    <div style="display: grid; gap: 1.5rem;">
+        <div>
+            <h3>Claim Details</h3>
+            <p><strong>Name:</strong> {{data.name}}</p>
+            <p><strong>Hospital:</strong> {{data.hospital}}</p>
+            <p><strong>Amount:</strong> ₹{{"{:,.2f}".format(data.amount)}}</p>
+        </div>
+        
+        <div>
+            <h3>Medical Bill</h3>
+            <a href="{{data.bill_url}}" target="_blank" class="btn btn-outline">
+                <i class="fas fa-file-pdf"></i> View Uploaded Bill
+            </a>
+        </div>
+        
+        <div class="glassy-card" style="background: rgba(102, 126, 234, 0.1);">
+            <h3><i class="fas fa-robot"></i> AI Recommendation</h3>
+            <p id="ai_result" style="font-size: 1.1rem;">{{data.ai_result}}</p>
+        </div>
+        
+        <div style="display: flex; gap: 1rem; justify-content: center;">
+            <button id="submitClaim" class="btn">
+                <i class="fas fa-check"></i> Submit Claim
+            </button>
+            
+            <button id="editClaim" class="btn btn-outline">
+                <i class="fas fa-edit"></i> Edit Details
+            </button>
+            
+            <button id="escalateClaim" class="btn btn-secondary">
+                <i class="fas fa-arrow-up"></i> Escalate to Officer
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/review.js"></script>
+{% endblock %}

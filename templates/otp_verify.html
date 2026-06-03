@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}Verify OTP - MediCurance{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 450px; margin: 3rem auto;">
+    <div class="card-header" style="text-align: center;">
+        <div
+            style="width: 70px; height: 70px; border-radius: 50%; background: var(--bg-alt); margin: 0 auto 1.5rem; display: flex; align-items: center; justify-content: center; color: var(--primary-color);">
+            <i class="fas fa-shield-alt" style="font-size: 2rem;"></i>
+        </div>
+        <h2>Verify OTP</h2>
+        <p class="text-muted">
+            We've sent a 6-digit verification code to <br><strong>+91 {{mobile}}</strong>
+        </p>
+    </div>
+
+    <form action="{{ url_for('auth.verify_otp_route') }}" method="POST" id="otpForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="mobile" value="{{mobile}}">
+
+        <div class="form-group">
+            <label class="form-label" style="text-align: center;">Enter 6-Digit Code</label>
+            <input type="text" name="otp" id="otp" class="form-control" placeholder="000000" required pattern="[0-9]{6}"
+                maxlength="6" style="text-align: center; font-size: 2rem; letter-spacing: 0.8rem; font-weight: 700;">
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.8rem;" id="verifyBtn">
+            Verify & Authenticate
+        </button>
+    </form>
+
+    <div style="margin-top: 2rem; text-align: center; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+        <p class="text-muted">Didn't receive the code?</p>
+        <div id="resendSection">
+            <p id="timerDisplay" style="color: var(--primary-color); font-weight: 600; margin-bottom: 0.5rem;"></p>
+            <button onclick="resendOTP()" id="resendBtn" class="btn btn-secondary btn-sm" style="display: none;">
+                <i class="fas fa-redo-alt"></i> Resend OTP
+            </button>
+        </div>
+        <div style="margin-top: 1rem;">
+            <a href="{{ url_for('auth.login') }}" class="text-muted"><i class="fas fa-arrow-left"></i> Change Number</a>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Auto-submit when 6 digits entered
+    document.getElementById('otp').addEventListener('input', function (e) {
+        this.value = this.value.replace(/[^0-9]/g, '').slice(0, 6);
+        if (this.value.length === 6) {
+            document.getElementById('otpForm').submit();
+        }
+    });
+
+    function resendOTP() {
+        const btn = document.getElementById('resendBtn');
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+        btn.disabled = true;
+
+        const formData = new FormData();
+        formData.append('mobile', '{{mobile}}');
+
+        fetch("{{ url_for('auth.send_otp_route') }}", {
+            method: 'POST',
+            body: formData
+        })
+            .then(response => {
+                if (response.ok) {
+                    alert('A new OTP has been sent.');
+                    location.reload(); // Simplest way to restart timer
+                } else {
+                    alert('Failed to resend OTP. Please try again.');
+                    btn.innerHTML = '<i class="fas fa-redo-alt"></i> Resend OTP';
+                    btn.disabled = false;
+                }
+            });
+    }
+
+    // Countdown timer
+    let timeLeft = 60;
+    const timerDisplay = document.getElementById('timerDisplay');
+    const resendBtn = document.getElementById('resendBtn');
+
+    const timer = setInterval(() => {
+        if (timeLeft <= 0) {
+            clearInterval(timer);
+            timerDisplay.innerHTML = 'You can now request a new code.';
+            resendBtn.style.display = 'inline-block';
+        } else {
+            timerDisplay.innerHTML = `<i class="fas fa-clock"></i> Resend available in ${timeLeft}s`;
+            timeLeft--;
+        }
+    }, 1000);
+</script>
+{% endblock %}

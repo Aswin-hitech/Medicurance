@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Government Officers | MediCurance{% endblock %}
+
+{% block content %}
+<!-- Sleek Admin Sub-Navbar -->
+<div class="card" style="padding: 1rem 1.5rem; margin-bottom: 2rem; background: var(--primary-color); border: none; border-radius: var(--border-radius);">
+    <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; justify-content: start;">
+        <span style="color: white; font-weight: 700; margin-right: 0.5rem;"><i class="fas fa-toolbox"></i> ADMIN CONTROL:</span>
+        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline btn-sm"><i class="fas fa-hospital"></i> Hospital Mgmt</a>
+        <a href="{{ url_for('admin.intelligence_dashboard') }}" class="btn btn-outline btn-sm"><i class="fas fa-brain"></i> AI Governance</a>
+        <a href="{{ url_for('admin.trust_analysis_dashboard') }}" class="btn btn-outline btn-sm"><i class="fas fa-shield-virus"></i> Claim Trust AI</a>
+        <a href="{{ url_for('admin.govt_database') }}" class="btn btn-outline btn-sm"><i class="fas fa-users-cog"></i> Govt Employees</a>
+        <a href="{{ url_for('admin.manage_officers') }}" class="btn btn-outline btn-sm" style="background: rgba(255,255,255,0.2);"><i class="fas fa-user-tie"></i> Manage Officers</a>
+        <a href="{{ url_for('admin.database_explorer') }}" class="btn btn-outline btn-sm"><i class="fas fa-database"></i> DB Explorer</a>
+    </div>
+</div>
+
+<div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.5rem;">
+    <div>
+        <h1><i class="fas fa-user-tie"></i> Manage Government Officers</h1>
+        <p class="text-muted">Register, edit, and deactivate official claim verifying authorities</p>
+    </div>
+    <button class="btn btn-primary" onclick="openAddModal()">
+        <i class="fas fa-user-plus"></i> Add New Officer
+    </button>
+</div>
+
+<!-- Search and Filter Form -->
+<div class="card" style="margin-top: 1.5rem;">
+    <form action="{{ url_for('admin.manage_officers') }}" method="GET" style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+        <div class="form-group" style="flex: 2; min-width: 250px; margin-bottom: 0;">
+            <label class="form-label"><i class="fas fa-search"></i> Search Officer</label>
+            <input type="text" name="q" class="form-control" placeholder="Search Officer ID, Employee ID, Name, Phone, Email..." value="{{ search_query }}">
+        </div>
+        
+        <div class="form-group" style="flex: 1; min-width: 180px; margin-bottom: 0;">
+            <label class="form-label"><i class="fas fa-building"></i> Department Filter</label>
+            <select name="department" class="form-control">
+                <option value="">All Departments</option>
+                {% for d in departments %}
+                <option value="{{ d }}" {% if selected_dept == d %}selected{% endif %}>{{ d }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="form-group" style="flex: 1; min-width: 180px; margin-bottom: 0;">
+            <label class="form-label"><i class="fas fa-map-marker-alt"></i> District Filter</label>
+            <select name="district" class="form-control">
+                <option value="">All Districts</option>
+                {% for dist in districts %}
+                <option value="{{ dist }}" {% if selected_dist == dist %}selected{% endif %}>{{ dist }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div style="display: flex; gap: 0.5rem; margin-top: auto;">
+            <button type="submit" class="btn btn-primary"><i class="fas fa-filter"></i> Apply Filters</button>
+            <a href="{{ url_for('admin.manage_officers') }}" class="btn btn-secondary" title="Reset Filters"><i class="fas fa-sync-alt"></i></a>
+        </div>
+    </form>
+</div>
+
+<!-- Officers Registry Table -->
+<div class="card" style="margin-top: 1.5rem;">
+    <h3>Official Officer Directory ({{ officers|length }} results)</h3>
+    <div class="table-responsive" style="margin-top: 1.5rem;">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Officer ID</th>
+                    <th>Name</th>
+                    <th>Department & Designation</th>
+                    <th>District</th>
+                    <th>Employee ID</th>
+                    <th>Phone & Email</th>
+                    <th>Joining Date</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for off in officers %}
+                <tr>
+                    <td style="font-weight: 700; color: var(--primary-color);">{{ off.officer_id }}</td>
+                    <td><strong>{{ off.name }}</strong></td>
+                    <td>{{ off.department }}<br><small class="text-muted">{{ off.designation }}</small></td>
+                    <td>{{ off.district }}</td>
+                    <td>{{ off.employee_id or 'N/A' }}</td>
+                    <td>{{ off.phone_number or off.phone or 'N/A' }}<br><small class="text-muted">{{ off.email }}</small></td>
+                    <td>{{ off.joining_date or off.date_of_joining or 'N/A' }}</td>
+                    <td>
+                        {% if off.status == 'Active' %}
+                        <span class="badge badge-approved"><i class="fas fa-check-circle"></i> Active</span>
+                        {% else %}
+                        <span class="badge badge-rejected"><i class="fas fa-ban"></i> Deactivated</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 0.25rem;">
+                            <button class="btn btn-secondary btn-sm" onclick="openEditModal({{ off | tojson }})">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                            <form action="{{ url_for('admin.manage_officers_toggle', officer_id=off.officer_id) }}" method="POST" style="margin:0;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-secondary btn-sm" style="color: {% if off.status == 'Active' %}var(--danger-color){% else %}var(--success-color){% endif %};">
+                                {% if off.status == 'Active' %}
+                                <i class="fas fa-user-slash"></i> Deactivate
+                                {% else %}
+                                <i class="fas fa-user-check"></i> Activate
+                                {% endif %}
+                                </button>
+                            </form>
+                            <form action="{{ url_for('admin.manage_officers_delete', officer_id=off.officer_id) }}" method="POST" style="margin:0;" onsubmit="return confirm('Are you sure you want to permanently delete this officer record?')">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-secondary btn-sm" style="color: var(--danger-color);"><i class="fas fa-trash-alt"></i> Delete</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 3rem;" class="text-muted">
+                        <i class="fas fa-user-shield" style="font-size: 3rem; margin-bottom: 1rem; color: var(--border-color);"></i>
+                        <p>No government officers registered matching current filter criteria.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ADD OFFICER MODAL -->
+<div id="addOfficerModal" style="display:none; position:fixed; z-index:1001; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.6); backdrop-filter: blur(4px); overflow-y: auto;">
+    <div class="card" style="max-width: 600px; margin: 5% auto; padding: 2.5rem; border-top: 5px solid var(--primary-color); position: relative; animation: fadeIn 0.3s ease-out;">
+        <button type="button" style="position: absolute; right: 1.5rem; top: 1.5rem; background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--secondary-color);" onclick="document.getElementById('addOfficerModal').style.display='none'">&times;</button>
+        
+        <h3><i class="fas fa-user-plus"></i> Register New Officer</h3>
+        <p class="text-muted" style="margin-bottom: 1.5rem;">Register a verified claim review officer into the directory.</p>
+        
+        <form action="{{ url_for('admin.manage_officers_add') }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Officer ID</label>
+                    <input type="text" name="officer_id" class="form-control" placeholder="e.g. OFF456" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Employee ID</label>
+                    <input type="text" name="employee_id" class="form-control" placeholder="e.g. GOVOFF001">
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Full Name</label>
+                    <input type="text" name="name" class="form-control" placeholder="Enter Full Name" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Official Email ID</label>
+                    <input type="email" name="email" class="form-control" placeholder="officer@gov.in" required>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Department</label>
+                    <input type="text" name="department" class="form-control" placeholder="e.g. Finance Department" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Designation</label>
+                    <input type="text" name="designation" class="form-control" placeholder="e.g. Under Secretary" required>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 1rem;">
+                <label class="form-label">District Jurisdiction</label>
+                <input type="text" name="district" class="form-control" placeholder="e.g. Chennai" required>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Phone Number</label>
+                    <input type="text" name="phone_number" class="form-control" placeholder="10-digit number" required pattern="[0-9]{10}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Joining Date</label>
+                    <input type="date" name="joining_date" class="form-control" required>
+                </div>
+            </div>
+
+            <div style="display:flex; gap:1rem; margin-top:2rem;">
+                <button type="submit" class="btn btn-primary" style="flex:1;">Register Officer</button>
+                <button type="button" class="btn btn-secondary" style="flex:1;" onclick="document.getElementById('addOfficerModal').style.display='none'">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- EDIT OFFICER MODAL -->
+<div id="editOfficerModal" style="display:none; position:fixed; z-index:1001; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.6); backdrop-filter: blur(4px); overflow-y: auto;">
+    <div class="card" style="max-width: 600px; margin: 5% auto; padding: 2.5rem; border-top: 5px solid var(--warning-color); position: relative; animation: fadeIn 0.3s ease-out;">
+        <button type="button" style="position: absolute; right: 1.5rem; top: 1.5rem; background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--secondary-color);" onclick="document.getElementById('editOfficerModal').style.display='none'">&times;</button>
+        
+        <h3><i class="fas fa-edit"></i> Modify Officer Details</h3>
+        <p class="text-muted" style="margin-bottom: 1.5rem;">Update credentials for the selected claim officer.</p>
+        
+        <form id="editOfficerForm" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Officer ID (Read-only)</label>
+                    <input type="text" id="edit_officer_id" class="form-control" readonly style="background-color: var(--bg-alt); cursor: not-allowed;">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Employee ID</label>
+                    <input type="text" name="employee_id" id="edit_employee_id" class="form-control">
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Full Name</label>
+                    <input type="text" name="name" id="edit_name" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Official Email ID</label>
+                    <input type="email" name="email" id="edit_email" class="form-control" required>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Department</label>
+                    <input type="text" name="department" id="edit_department" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Designation</label>
+                    <input type="text" name="designation" id="edit_designation" class="form-control" required>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 1rem;">
+                <label class="form-label">District Jurisdiction</label>
+                <input type="text" name="district" id="edit_district" class="form-control" required>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Phone Number</label>
+                    <input type="text" name="phone_number" id="edit_phone_number" class="form-control" required pattern="[0-9]{10}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Joining Date</label>
+                    <input type="date" name="joining_date" id="edit_joining_date" class="form-control" required>
+                </div>
+            </div>
+
+            <div style="display:flex; gap:1rem; margin-top:2rem;">
+                <button type="submit" class="btn btn-primary" style="flex:1; background-color: var(--primary-color);">Update Officer Details</button>
+                <button type="button" class="btn btn-secondary" style="flex:1;" onclick="document.getElementById('editOfficerModal').style.display='none'">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    function openAddModal() {
+        document.getElementById('addOfficerModal').style.display = 'block';
+    }
+    
+    function openEditModal(officer) {
+        document.getElementById('edit_officer_id').value = officer.officer_id;
+        document.getElementById('edit_employee_id').value = officer.employee_id || '';
+        document.getElementById('edit_name').value = officer.name;
+        document.getElementById('edit_department').value = officer.department;
+        document.getElementById('edit_designation').value = officer.designation;
+        document.getElementById('edit_district').value = officer.district;
+        document.getElementById('edit_phone_number').value = officer.phone_number || officer.phone || '';
+        document.getElementById('edit_email').value = officer.email;
+        document.getElementById('edit_joining_date').value = officer.joining_date || officer.date_of_joining || '';
+        
+        // Dynamically point the form action to the correct edit route
+        document.getElementById('editOfficerForm').action = "/admin/manage_officers/edit/" + officer.officer_id;
+        
+        document.getElementById('editOfficerModal').style.display = 'block';
+    }
+</script>
+{% endblock %}

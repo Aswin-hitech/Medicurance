@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Profile | MediCurance{% endblock %}
+
+{% block content %}
+<div class="card animate-in">
+    <div class="toolbar" style="margin-bottom:1rem;">
+        <div>
+            <div class="chip"><i class="fa-solid fa-user"></i> Profile</div>
+            <h1 style="margin-top:0.75rem;">{{ employee.get('name') or user.get('name') or mobile }}</h1>
+            <p class="muted">{% if employee.get('employee_id') %}Verified government employee{% else %}Account overview{% endif %}</p>
+        </div>
+        <span class="badge {% if employee.get('employee_id') %}badge-approved{% else %}badge-pending{% endif %}">{% if employee.get('employee_id') %}Linked{% else %}Unverified{% endif %}</span>
+    </div>
+
+    <div class="stats-row">
+        <div class="stat-card">
+            <div class="muted">Role</div>
+            <div class="stat-value" style="font-size:1.35rem;">{{ session.get('role', 'user')|upper }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="muted">Pending</div>
+            <div class="stat-value">{{ pending_count|default(0) }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="muted">Approved</div>
+            <div class="stat-value">{{ approved_count|default(0) }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="muted">Rejected</div>
+            <div class="stat-value">{{ rejected_count|default(0) }}</div>
+        </div>
+    </div>
+
+    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-top:1rem;">
+        <div class="card" style="margin-bottom:0;">
+            <h3>Account</h3>
+            <p><strong>Mobile:</strong> {{ mobile }}</p>
+            <p><strong>Status:</strong> Active</p>
+            <p><strong>Role:</strong> {{ session.get('role', 'user')|title }}</p>
+        </div>
+        <div class="card" style="margin-bottom:0;">
+            <h3>Security</h3>
+            <p class="muted">Keep your password updated when needed.</p>
+            <a href="{{ url_for('auth.forgot_password') }}" class="btn btn-secondary"><i class="fa-solid fa-key"></i> Reset password</a>
+        </div>
+    </div>
+
+    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-top:1rem;">
+        <div class="card">
+            <h3>Employment</h3>
+            <p><strong>Employee ID:</strong> {{ employee.get('employee_id') or user.get('employee_id') or 'N/A' }}</p>
+            <p><strong>Department:</strong> {{ employee.get('department') or user.get('department') or 'N/A' }}</p>
+            <p><strong>Designation:</strong> {{ employee.get('designation') or user.get('designation') or 'N/A' }}</p>
+            <p><strong>District:</strong> {{ employee.get('district') or user.get('district') or 'N/A' }}</p>
+        </div>
+        <div class="card">
+            <h3>Insurance</h3>
+            <p><strong>Policy:</strong> {{ employee.get('policy_number') or user.get('policy_number') or 'N/A' }}</p>
+            <p><strong>Provider:</strong> {{ employee.get('insurance_provider') or user.get('insurance_provider') or 'N/A' }}</p>
+            <p><strong>Eligibility:</strong> {{ employee.get('claim_eligibility') or user.get('claim_eligibility') or 'N/A' }}</p>
+            <p><strong>Blood group:</strong> {{ employee.get('blood_group') or user.get('blood_group') or 'N/A' }}</p>
+        </div>
+    </div>
+
+    <div style="margin-top:1rem;">
+        <a href="{{ url_for('user.dashboard') }}" class="btn btn-primary"><i class="fa-solid fa-arrow-left"></i> Back</a>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+
+{% block title %}Claim Trust AI Engine | MediCurance{% endblock %}
+
+{% block content %}
+<!-- Sleek Admin Sub-Navbar -->
+<div class="card" style="padding: 1rem 1.5rem; margin-bottom: 2rem; background: var(--primary-color); border: none; border-radius: var(--border-radius);">
+    <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; justify-content: start;">
+        <span style="color: white; font-weight: 700; margin-right: 0.5rem;"><i class="fas fa-toolbox"></i> ADMIN CONTROL:</span>
+        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline btn-sm"><i class="fas fa-hospital"></i> Hospital Mgmt</a>
+        <a href="{{ url_for('admin.intelligence_dashboard') }}" class="btn btn-outline btn-sm"><i class="fas fa-brain"></i> AI Governance</a>
+        <a href="{{ url_for('admin.trust_analysis_dashboard') }}" class="btn btn-outline btn-sm" style="background: rgba(255,255,255,0.2);"><i class="fas fa-shield-virus"></i> Claim Trust AI</a>
+        <a href="{{ url_for('admin.govt_database') }}" class="btn btn-outline btn-sm"><i class="fas fa-users-cog"></i> Govt Employees</a>
+        <a href="{{ url_for('admin.manage_officers') }}" class="btn btn-outline btn-sm"><i class="fas fa-user-tie"></i> Manage Officers</a>
+        <a href="{{ url_for('admin.database_explorer') }}" class="btn btn-outline btn-sm"><i class="fas fa-database"></i> DB Explorer</a>
+    </div>
+</div>
+
+<div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+    <div>
+        <h1><i class="fas fa-shield-virus"></i> Claim Trust AI & Verification System</h1>
+        <p class="text-muted">Multi-layered automated verification evaluating claim security, data reliability, and hospital networks</p>
+    </div>
+    <div style="background-color: var(--bg-alt); padding: 0.75rem 1.25rem; border-radius: var(--border-radius); border: 1px solid var(--border-color); font-size: 0.85rem; font-weight: 600;">
+        <i class="fas fa-calculator" style="color: var(--primary-color);"></i> trust_score = 
+        <span style="color: var(--primary-color);">AI 30% + OCR 20% + Hospital 20% + Duplicate 20% + Government 10%</span>
+    </div>
+</div>
+
+<!-- Trust Category Color Guide -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-top: 1.5rem; margin-bottom: 2rem;">
+    <div class="card" style="margin: 0; padding: 1.25rem; border-left: 5px solid var(--success-color); background: #fdfdfd; display: flex; align-items: center; gap: 1rem;">
+        <div style="width: 40px; height: 40px; border-radius: 50%; background: #e2f0d9; display: flex; align-items: center; justify-content: center;">
+            <i class="fas fa-shield-alt" style="color: var(--success-color); font-size: 1.2rem;"></i>
+        </div>
+        <div>
+            <h4 style="margin: 0; color: var(--success-color);">SECURE (85 - 100%)</h4>
+            <span class="text-muted" style="font-size: 0.8rem;">Highly credible, automated path clear.</span>
+        </div>
+    </div>
+    
+    <div class="card" style="margin: 0; padding: 1.25rem; border-left: 5px solid var(--warning-color); background: #fdfdfd; display: flex; align-items: center; gap: 1rem;">
+        <div style="width: 40px; height: 40px; border-radius: 50%; background: #fffcf0; display: flex; align-items: center; justify-content: center;">
+            <i class="fas fa-exclamation-triangle" style="color: var(--warning-color); font-size: 1.2rem;"></i>
+        </div>
+        <div>
+            <h4 style="margin: 0; color: #856404;">CAUTION (60 - 85%)</h4>
+            <span class="text-muted" style="font-size: 0.8rem;">Partial anomalies; requires manual review.</span>
+        </div>
+    </div>
+    
+    <div class="card" style="margin: 0; padding: 1.25rem; border-left: 5px solid var(--danger-color); background: #fdfdfd; display: flex; align-items: center; gap: 1rem;">
+        <div style="width: 40px; height: 40px; border-radius: 50%; background: #fff5f5; display: flex; align-items: center; justify-content: center;">
+            <i class="fas fa-skull-crossbones" style="color: var(--danger-color); font-size: 1.2rem;"></i>
+        </div>
+        <div>
+            <h4 style="margin: 0; color: var(--danger-color);">HIGH RISK (< 60%)</h4>
+            <span class="text-muted" style="font-size: 0.8rem;">Multiple red flags; suspend & audit.</span>
+        </div>
+    </div>
+</div>
+
+<!-- Claims Listing with Expandable Trust Auditing -->
+<div class="card">
+    <h3>Reimbursement Audits</h3>
+    <p class="text-muted" style="font-size: 0.9rem; margin-bottom: 1.5rem;">Click on any claim row to expand the detailed Multi-Layered AI Trust Report.</p>
+    
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width: 5%;"></th>
+                    <th style="width: 15%;">Claim ID</th>
+                    <th style="width: 15%;">Claimant</th>
+                    <th style="width: 15%;">Hospital</th>
+                    <th style="width: 12%;">Amount</th>
+                    <th style="width: 13%;">Submission Date</th>
+                    <th style="width: 13%;">Overall Trust Score</th>
+                    <th style="width: 12%;">Audit Result</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for claim in claims %}
+                <!-- Main row -->
+                <tr style="cursor: pointer; transition: background 0.15s;" onclick="toggleAuditRow('audit-{{ claim.claim_id }}', this)" class="claim-row">
+                    <td><i class="fas fa-chevron-right" style="transition: transform 0.2s;" id="icon-{{ claim.claim_id }}"></i></td>
+                    <td style="font-weight: 700; color: var(--primary-color);">{{ claim.claim_id[-12:] }}</td>
+                    <td><strong>{{ claim.claimant_name }}</strong><br><small class="text-muted">{{ claim.mobile }}</small></td>
+                    <td>{{ claim.hospital }}</td>
+                    <td><strong>₹{{ "{:,.2f}".format(claim.amount) }}</strong></td>
+                    <td><small>{{ claim.date[:10] if claim.date else 'N/A' }}</small></td>
+                    <td style="font-weight: 800; color: {% if claim.color == 'Green' %}var(--success-color){% elif claim.color == 'Orange' %}#856404{% else %}var(--danger-color){% endif %}; font-size: 1.1rem;">
+                        {{ claim.trust_score }}%
+                    </td>
+                    <td>
+                        <span class="badge {{ claim.badge_class }}" style="padding: 0.35rem 0.75rem; font-size: 0.75rem;">
+                            {{ claim.risk_level }}
+                        </span>
+                    </td>
+                </tr>
+                
+                <!-- Expandable Audit Details row -->
+                <tr id="audit-{{ claim.claim_id }}" style="display: none; background-color: var(--bg-alt);">
+                    <td colspan="8" style="padding: 2rem; border-top: none; border-bottom: 2px solid var(--border-color);">
+                        <div style="display: grid; grid-template-columns: 1fr 1.25fr; gap: 2.5rem; flex-wrap: wrap;">
+                            <!-- Trust Meter Circular representation -->
+                            <div>
+                                <h4 style="margin-bottom: 1rem; color: var(--primary-color); border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;"><i class="fas fa-tachometer-alt"></i> Trust Meter</h4>
+                                
+                                <div style="display: flex; align-items: center; justify-content: center; flex-direction: column; padding: 1.5rem; background: white; border-radius: var(--border-radius); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm);">
+                                    <!-- Overall Score Meter -->
+                                    <div style="font-size: 2.8rem; font-weight: 900; color: {% if claim.color == 'Green' %}var(--success-color){% elif claim.color == 'Orange' %}#e28b00{% else %}var(--danger-color){% endif %};">
+                                        {{ claim.trust_score }}%
+                                    </div>
+                                    <span style="font-weight: 700; text-transform: uppercase; margin-top: 0.25rem; font-size: 0.9rem;" class="badge {{ claim.badge_class }}">
+                                        {{ claim.risk_level }} STATUS
+                                    </span>
+                                    
+                                    <!-- Trust Score visual bar -->
+                                    <div style="width: 100%; height: 10px; background-color: var(--border-color); border-radius: 50px; margin-top: 1.5rem; overflow: hidden;">
+                                        <div style="width: {{ claim.trust_score }}%; height: 100%; background-color: {% if claim.color == 'Green' %}var(--success-color){% elif claim.color == 'Orange' %}var(--warning-color){% else %}var(--danger-color){% endif %};"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Trust Breakdown sub-scores -->
+                                <h4 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--primary-color); border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;"><i class="fas fa-list-ol"></i> Sub-Score Breakdown</h4>
+                                <table class="table" style="margin-bottom: 0; background: white; border-radius: var(--border-radius); border: 1px solid var(--border-color);">
+                                    <tbody>
+                                        <tr>
+                                            <td style="font-size: 0.85rem; font-weight: 600;">1. AI Confidence Model:</td>
+                                            <td style="text-align: right; font-weight: 700; color: var(--primary-color);">{{ claim.ai_confidence }}%</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="font-size: 0.85rem; font-weight: 600;">2. OCR Data Completeness:</td>
+                                            <td style="text-align: right; font-weight: 700; color: var(--primary-color);">{{ claim.ocr_quality }}%</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="font-size: 0.85rem; font-weight: 600;">3. Hospital Credential Status:</td>
+                                            <td style="text-align: right; font-weight: 700; color: var(--primary-color);">{{ claim.hospital_trust }}%</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="font-size: 0.85rem; font-weight: 600;">4. Document Uniqueness Match:</td>
+                                            <td style="text-align: right; font-weight: 700; color: var(--primary-color);">{{ claim.duplicate_prob_inverse }}%</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="font-size: 0.85rem; font-weight: 600;">5. Government Employee Status:</td>
+                                            <td style="text-align: right; font-weight: 700; color: var(--primary-color);">{{ claim.govt_verified }}%</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                <h4 style="margin-top: 1.5rem; margin-bottom: 1rem; color: var(--primary-color); border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;"><i class="fas fa-percent"></i> Weighted Contributions</h4>
+                                <table class="table" style="margin-bottom: 0; background: white; border-radius: var(--border-radius); border: 1px solid var(--border-color);">
+                                    <tbody>
+                                        {% for label, key in [('AI', 'ai_confidence'), ('OCR', 'ocr_confidence'), ('Hospital', 'hospital_trust'), ('Duplicate', 'duplicate_prob_inverse'), ('Government', 'govt_verified')] %}
+                                        <tr>
+                                            <td style="font-size: 0.85rem; font-weight: 600;">{{ label }}</td>
+                                            <td style="text-align: right; font-weight: 700; color: var(--primary-color);">{{ claim.contributions.get(key, 0)|round(1) }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <!-- Reasoning Details & Remarks -->
+                            <div>
+                                <h4 style="margin-bottom: 1rem; color: var(--primary-color); border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;"><i class="fas fa-tasks"></i> Automated Risk Diagnostics</h4>
+                                <ul style="margin: 0; padding-left: 1.5rem; display: flex; flex-direction: column; gap: 0.75rem;">
+                                    {% for r in claim.reasoning %}
+                                    <li style="font-size: 0.95rem; font-weight: 500; color: var(--text-color);">
+                                        {% if 'CRITICAL' in r or 'flags' in r or 'unverified' in r %}
+                                        <i class="fas fa-exclamation-circle" style="color: var(--danger-color); margin-right: 0.25rem;"></i>
+                                        {% else %}
+                                        <i class="fas fa-check-circle" style="color: var(--success-color); margin-right: 0.25rem;"></i>
+                                        {% endif %}
+                                        {{ r }}
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+
+                                <h4 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--primary-color); border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;"><i class="fas fa-comment-dots"></i> Review Log & Officer Remarks</h4>
+                                <div style="background: white; border: 1px solid var(--border-color); padding: 1.25rem; border-radius: var(--border-radius); box-shadow: var(--shadow-sm);">
+                                    <p style="margin: 0; font-style: italic; font-size: 0.95rem; color: var(--secondary-color);">
+                                        "{{ claim.remarks }}"
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" style="text-align: center; padding: 3rem;" class="text-muted">
+                        <i class="fas fa-shield-virus" style="font-size: 3rem; margin-bottom: 1rem; color: var(--border-color);"></i>
+                        <p>No claims submitted yet to analyze.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<style>
+    .claim-row:hover {
+        background-color: var(--bg-alt) !important;
+    }
+</style>
+
+<script>
+    function toggleAuditRow(id, rowElement) {
+        const detailRow = document.getElementById(id);
+        const icon = document.getElementById('icon-' + id.substring(6));
+        
+        if (detailRow.style.display === 'none') {
+            detailRow.style.display = 'table-row';
+            icon.style.transform = 'rotate(90deg)';
+            rowElement.style.backgroundColor = 'var(--bg-alt)';
+        } else {
+            detailRow.style.display = 'none';
+            icon.style.transform = 'rotate(0deg)';
+            rowElement.style.backgroundColor = '';
+        }
+    }
+</script>
+{% endblock %}

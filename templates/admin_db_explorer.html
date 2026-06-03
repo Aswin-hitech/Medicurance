@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+
+{% block title %}Database Explorer | MediCurance{% endblock %}
+
+{% block content %}
+<!-- Sleek Admin Sub-Navbar -->
+<div class="card" style="padding: 1rem 1.5rem; margin-bottom: 2rem; background: var(--primary-color); border: none; border-radius: var(--border-radius);">
+    <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; justify-content: start;">
+        <span style="color: white; font-weight: 700; margin-right: 0.5rem;"><i class="fas fa-toolbox"></i> ADMIN CONTROL:</span>
+        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline btn-sm"><i class="fas fa-hospital"></i> Hospital Mgmt</a>
+        <a href="{{ url_for('admin.intelligence_dashboard') }}" class="btn btn-outline btn-sm"><i class="fas fa-brain"></i> AI Governance</a>
+        <a href="{{ url_for('admin.trust_analysis_dashboard') }}" class="btn btn-outline btn-sm"><i class="fas fa-shield-virus"></i> Claim Trust AI</a>
+        <a href="{{ url_for('admin.govt_database') }}" class="btn btn-outline btn-sm"><i class="fas fa-users-cog"></i> Govt Employees</a>
+        <a href="{{ url_for('admin.manage_officers') }}" class="btn btn-outline btn-sm"><i class="fas fa-user-tie"></i> Manage Officers</a>
+        <a href="{{ url_for('admin.database_explorer') }}" class="btn btn-outline btn-sm" style="background: rgba(255,255,255,0.2);"><i class="fas fa-database"></i> DB Explorer</a>
+    </div>
+</div>
+
+<div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.5rem;">
+    <div>
+        <h1><i class="fas fa-database"></i> Internal Database Explorer</h1>
+        <p class="text-muted"><span style="color: var(--success-color); font-weight: 700;"><i class="fas fa-eye"></i> READ-ONLY WORKSPACE:</span> Inspect records, search tables, and export collections safely</p>
+    </div>
+    <a href="{{ url_for('admin.db_explorer_export', collection=active_collection, masked=1) }}" class="btn btn-primary" style="background-color: var(--success-color); border: none;">
+        <i class="fas fa-file-csv"></i> Export Masked CSV
+    </a>
+</div>
+
+<!-- Collection Selection Tabs -->
+<div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1.5rem; border-bottom: 2px solid var(--border-color); padding-bottom: 1rem;">
+    {% for col in collections %}
+    <a href="{{ url_for('admin.database_explorer', collection=col) }}" class="btn btn-sm" 
+       style="font-weight: 700; border-radius: 50px; font-size: 0.85rem; padding: 0.5rem 1.2rem;
+              {% if active_collection == col %}
+              background-color: var(--primary-color); color: white;
+              {% else %}
+              background-color: var(--bg-alt); color: var(--secondary-color); border: 1px solid var(--border-color);
+              {% endif %}">
+        <i class="fas fa-folder-open" style="margin-right: 0.25rem;"></i> {{ col | upper }}
+    </a>
+    {% endfor %}
+</div>
+
+<!-- Search, Pagination count and Sort Options -->
+<div class="card" style="margin-top: 1.5rem; border-bottom: 3px solid var(--primary-color);">
+    <form action="{{ url_for('admin.database_explorer') }}" method="GET" style="display: flex; gap: 1.25rem; align-items: flex-end; flex-wrap: wrap;">
+        <input type="hidden" name="collection" value="{{ active_collection }}">
+        
+        <div class="form-group" style="flex: 2; min-width: 250px; margin-bottom: 0;">
+            <label class="form-label"><i class="fas fa-search"></i> Universal Text Filter</label>
+            <input type="text" name="q" class="form-control" placeholder="Search records in this collection..." value="{{ search_query }}">
+        </div>
+        
+        <div class="form-group" style="flex: 1; min-width: 180px; margin-bottom: 0;">
+            <label class="form-label"><i class="fas fa-sort-amount-down"></i> Sort Field</label>
+            <select name="sort" class="form-control">
+                <option value="_id" {% if sort_by == '_id' %}selected{% endif %}>Primary ID (_id)</option>
+                <option value="created_at" {% if sort_by == 'created_at' %}selected{% endif %}>Created Timestamp</option>
+                {% if active_collection in ['users', 'govtlist', 'government_officers'] %}
+                <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Name</option>
+                <option value="employee_id" {% if sort_by == 'employee_id' %}selected{% endif %}>Employee ID</option>
+                {% elif active_collection == 'claims' %}
+                <option value="claim_id" {% if sort_by == 'claim_id' %}selected{% endif %}>Claim ID</option>
+                <option value="amount" {% if sort_by == 'amount' %}selected{% endif %}>Amount</option>
+                <option value="status" {% if sort_by == 'status' %}selected{% endif %}>Status</option>
+                {% endif %}
+            </select>
+        </div>
+        
+        <div class="form-group" style="flex: 0.8; min-width: 150px; margin-bottom: 0;">
+            <label class="form-label">Sort Direction</label>
+            <select name="order" class="form-control">
+                <option value="-1" {% if sort_order == -1 %}selected{% endif %}>Descending</option>
+                <option value="1" {% if sort_order == 1 %}selected{% endif %}>Ascending</option>
+            </select>
+        </div>
+        
+        <div style="display: flex; gap: 0.5rem; margin-top: auto;">
+            <button type="submit" class="btn btn-primary"><i class="fas fa-search-plus"></i> Query</button>
+            <a href="{{ url_for('admin.database_explorer', collection=active_collection) }}" class="btn btn-secondary" title="Reset Search"><i class="fas fa-sync"></i></a>
+        </div>
+    </form>
+</div>
+
+<!-- Table list of Records -->
+<div class="card" style="margin-top: 1.5rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+        <h3>Registry Records ({{ total_records }} total matching)</h3>
+        <span class="text-muted" style="font-size: 0.9rem; font-weight: 600;">
+            Showing page {{ page }} of {{ total_pages }}
+        </span>
+    </div>
+    
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width: 25%;">System ID (_id)</th>
+                    <th style="width: 25%;">Primary Identifiers</th>
+                    <th style="width: 35%;">Key Metadata Preview</th>
+                    <th style="width: 15%; text-align: center;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in records %}
+                <tr>
+                    <td style="font-family: monospace; font-size: 0.85rem; color: var(--secondary-color);">{{ record.doc._id }}</td>
+                    <td>
+                        <!-- Dynamic primary labels depending on collections -->
+                        {% if active_collection == 'users' %}
+                        <strong>Mobile: {{ record.doc.mobile }}</strong><br>
+                        <span class="badge badge-approved" style="background-color: var(--primary-color); color: white;">Role: {{ record.doc.role | upper }}</span>
+                        {% elif active_collection == 'claims' %}
+                        <strong>Claim ID: {{ record.doc.claim_id[-12:] }}</strong><br>
+                        <span>Claimant: {{ record.doc.name }}</span>
+                        {% elif active_collection == 'govtlist' %}
+                        <strong>Emp ID: {{ record.doc.employee_id }}</strong><br>
+                        <span>Name: {{ record.doc.name }}</span>
+                        {% elif active_collection == 'government_officers' %}
+                        <strong>Officer ID: {{ record.doc.officer_id }}</strong><br>
+                        <span>Name: {{ record.doc.name }}</span>
+                        {% elif active_collection == 'admins' %}
+                        <strong>Email: {{ record.doc.email }}</strong><br>
+                        <span>Name: {{ record.doc.name }}</span>
+                        {% elif active_collection == 'hospitals' %}
+                        <strong>{{ record.doc.name }}</strong><br>
+                        <small class="text-muted">{{ record.doc.city }}, {{ record.doc.state }}</small>
+                        {% elif active_collection == 'otp' %}
+                        <strong>Mobile: {{ record.doc.mobile }}</strong><br>
+                        <small class="text-muted">OTP: {{ record.doc.otp }}</small>
+                        {% else %}
+                        <strong>System Record Document</strong>
+                        {% endif %}
+                    </td>
+                    <td style="font-size: 0.85rem;">
+                        <!-- Dynamic columns depending on collections -->
+                        {% if active_collection == 'users' %}
+                        Dept: {{ record.doc.department or 'N/A' }} | Govt Verified: {{ record.doc.is_government_employee or 'False' }}
+                        {% elif active_collection == 'claims' %}
+                        Hospital: {{ record.doc.hospital }}<br>Amount: <strong>₹{{ "{:,.2f}".format(record.doc.amount) }}</strong> | Status: <span class="badge badge-pending">{{ record.doc.status }}</span>
+                        {% elif active_collection == 'govtlist' %}
+                        Dept: {{ record.doc.department }} | Desg: {{ record.doc.designation }}<br>Policy No: {{ record.doc.policy_number or 'N/A' }}
+                        {% elif active_collection == 'government_officers' %}
+                        Dept: {{ record.doc.department }} | Dist: {{ record.doc.district }}<br>Status: {{ record.doc.status }}
+                        {% elif active_collection == 'admins' %}
+                        Role: {{ record.doc.role }} | Joined: {{ record.doc.created_at[:10] if record.doc.created_at else 'N/A' }}
+                        {% elif active_collection == 'hospitals' %}
+                        Network: <span class="badge {% if record.doc.network %}badge-approved{% else %}badge-rejected{% endif %}">{{ 'IN-NETWORK' if record.doc.network else 'OUT' }}</span>
+                        {% elif active_collection == 'otp' %}
+                        Timestamp: {{ record.doc.timestamp }}
+                        {% else %}
+                        Keys: {{ record.doc.keys() | list | join(', ') }}
+                        {% endif %}
+                    </td>
+                    <td style="text-align: center;">
+                        <button class="btn btn-primary btn-sm" onclick="openJsonModal({{ record.json_str | tojson }})">
+                            <i class="fas fa-code"></i> View JSON
+                        </button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" style="text-align: center; padding: 3rem;" class="text-muted">
+                        <i class="fas fa-search-minus" style="font-size: 3rem; margin-bottom: 1rem; color: var(--border-color);"></i>
+                        <p>No documents found in collection matching filters.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- PAGINATION FOOTER BUTTONS -->
+    {% if total_pages > 1 %}
+    <div style="display: flex; justify-content: center; gap: 0.5rem; margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+        <a href="{{ url_for('admin.database_explorer', collection=active_collection, q=search_query, sort=sort_by, order=sort_order, page=page-1) }}" 
+           class="btn btn-secondary btn-sm {% if page == 1 %}disabled{% endif %}" 
+           style="padding: 0.4rem 1rem; {% if page == 1 %}pointer-events: none; opacity: 0.5;{% endif %}">
+            <i class="fas fa-chevron-left"></i> Previous
+        </a>
+        
+        {% for p in range(1, total_pages + 1) %}
+        {% if p == page or (p >= page - 2 and p <= page + 2) %}
+        <a href="{{ url_for('admin.database_explorer', collection=active_collection, q=search_query, sort=sort_by, order=sort_order, page=p) }}" 
+           class="btn btn-sm {% if p == page %}btn-primary{% else %}btn-secondary{% endif %}" 
+           style="padding: 0.4rem 0.8rem; font-weight: 700;">
+            {{ p }}
+        </a>
+        {% endif %}
+        {% endfor %}
+        
+        <a href="{{ url_for('admin.database_explorer', collection=active_collection, q=search_query, sort=sort_by, order=sort_order, page=page+1) }}" 
+           class="btn btn-secondary btn-sm {% if page == total_pages %}disabled{% endif %}" 
+           style="padding: 0.4rem 1rem; {% if page == total_pages %}pointer-events: none; opacity: 0.5;{% endif %}">
+            Next <i class="fas fa-chevron-right"></i>
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- JSON MODAL VIEWER -->
+<div id="jsonModal" style="display:none; position:fixed; z-index:1001; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.6); backdrop-filter: blur(4px);">
+    <div class="card" style="max-width: 650px; margin: 5% auto; padding: 2.5rem; border-top: 5px solid var(--primary-color); position: relative; animation: fadeIn 0.3s ease-out; height: 75vh; display: flex; flex-direction: column;">
+        <button type="button" style="position: absolute; right: 1.5rem; top: 1.5rem; background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--secondary-color);" onclick="document.getElementById('jsonModal').style.display='none'">&times;</button>
+        
+        <h3 style="margin-bottom: 1.25rem;"><i class="fas fa-file-code"></i> JSON Document Inspector</h3>
+        
+        <div style="flex: 1; background-color: #1e1e1e; color: #d4d4d4; padding: 1.5rem; border-radius: var(--border-radius); overflow: auto; font-family: 'Consolas', 'Courier New', monospace; font-size: 0.85rem; border: 1px solid #3c3c3c; line-height: 1.5;">
+            <pre style="margin: 0;"><code id="jsonCode"></code></pre>
+        </div>
+        
+        <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
+            <button class="btn btn-primary" onclick="copyJsonText()" style="flex: 1;"><i class="fas fa-copy"></i> Copy to Clipboard</button>
+            <button class="btn btn-secondary" onclick="document.getElementById('jsonModal').style.display='none'" style="flex: 1;">Close Inspector</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let activeJsonStr = '';
+
+    function openJsonModal(jsonStr) {
+        activeJsonStr = jsonStr;
+        document.getElementById('jsonCode').textContent = jsonStr;
+        document.getElementById('jsonModal').style.display = 'block';
+    }
+    
+    function copyJsonText() {
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(activeJsonStr).then(() => {
+                alert("JSON document copied to clipboard successfully!");
+            });
+        } else {
+            // Fallback
+            const el = document.createElement('textarea');
+            el.value = activeJsonStr;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+            alert("JSON document copied to clipboard successfully!");
+        }
+    }
+</script>
+{% endblock %}

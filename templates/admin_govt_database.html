@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Government Employee Database | MediCurance{% endblock %}
+
+{% block content %}
+<!-- Sleek Admin Sub-Navbar -->
+<div class="card" style="padding: 1rem 1.5rem; margin-bottom: 2rem; background: var(--primary-color); border: none; border-radius: var(--border-radius);">
+    <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; justify-content: start;">
+        <span style="color: white; font-weight: 700; margin-right: 0.5rem;"><i class="fas fa-toolbox"></i> ADMIN CONTROL:</span>
+        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline btn-sm"><i class="fas fa-hospital"></i> Hospital Mgmt</a>
+        <a href="{{ url_for('admin.intelligence_dashboard') }}" class="btn btn-outline btn-sm"><i class="fas fa-brain"></i> AI Governance</a>
+        <a href="{{ url_for('admin.trust_analysis_dashboard') }}" class="btn btn-outline btn-sm"><i class="fas fa-shield-virus"></i> Claim Trust AI</a>
+        <a href="{{ url_for('admin.govt_database') }}" class="btn btn-outline btn-sm" style="background: rgba(255,255,255,0.2);"><i class="fas fa-users-cog"></i> Govt Employees</a>
+        <a href="{{ url_for('admin.manage_officers') }}" class="btn btn-outline btn-sm"><i class="fas fa-user-tie"></i> Manage Officers</a>
+        <a href="{{ url_for('admin.database_explorer') }}" class="btn btn-outline btn-sm"><i class="fas fa-database"></i> DB Explorer</a>
+    </div>
+</div>
+
+<div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.5rem;">
+    <div>
+        <h1><i class="fas fa-users-cog"></i> Government Employee Database</h1>
+        <p class="text-muted">Manage the registry of verified government employee policyholders</p>
+    </div>
+    <button class="btn btn-primary" onclick="document.getElementById('uploadCsvModal').style.display='block'">
+        <i class="fas fa-file-upload"></i> Upload CSV Database
+    </button>
+</div>
+
+<!-- Stats Counter -->
+<div class="dashboard-grid" style="margin-top: 1.5rem; margin-bottom: 2rem;">
+    <div class="card" style="text-align: center; border-left: 4px solid var(--primary-color); margin: 0; padding: 1.5rem;">
+        <h4 class="text-muted">Total Registered Employees</h4>
+        <h2 style="font-size: 2.2rem; margin-top: 0.5rem; color: var(--primary-color);">{{ employees|length }}</h2>
+    </div>
+    <div class="card" style="text-align: center; border-left: 4px solid var(--success-color); margin: 0; padding: 1.5rem;">
+        <h4 class="text-muted">Eligible for Claims</h4>
+        <h2 style="font-size: 2.2rem; margin-top: 0.5rem; color: var(--success-color);">
+            {{ employees|selectattr('claim_eligibility', 'equalto', True)|list|length }}
+        </h2>
+    </div>
+    <div class="card" style="text-align: center; border-left: 4px solid var(--danger-color); margin: 0; padding: 1.5rem;">
+        <h4 class="text-muted">Ineligible / Suspended</h4>
+        <h2 style="font-size: 2.2rem; margin-top: 0.5rem; color: var(--danger-color);">
+            {{ employees|selectattr('claim_eligibility', 'equalto', False)|list|length }}
+        </h2>
+    </div>
+</div>
+
+<!-- Employees Registry Table -->
+<div class="card">
+    <h3>Official Employee Registry</h3>
+    <div class="table-responsive" style="margin-top: 1.5rem; max-height: 550px; overflow-y: auto;">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Employee ID</th>
+                    <th>Name</th>
+                    <th>Mobile</th>
+                    <th>Email</th>
+                    <th>Department & Designation</th>
+                    <th>Policy Number</th>
+                    <th>Eligibility</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for emp in employees %}
+                <tr>
+                    <td style="font-weight: 700; color: var(--primary-color);">{{ emp.employee_id }}</td>
+                    <td><strong>{{ emp.name }}</strong><br><small class="text-muted">{{ emp.gender }}, {{ emp.age }} yrs</small></td>
+                    <td>{{ emp.phone_number }}</td>
+                    <td><small>{{ emp.email }}</small></td>
+                    <td>{{ emp.department }}<br><small class="text-muted">{{ emp.designation }}</small></td>
+                    <td><small class="badge badge-pending" style="background-color: var(--secondary-color); color: white;">{{ emp.policy_number or 'N/A' }}</small></td>
+                    <td>
+                        {% if emp.claim_eligibility %}
+                        <span class="badge badge-approved">Eligible</span>
+                        {% else %}
+                        <span class="badge badge-rejected">Ineligible</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 3rem;" class="text-muted">
+                        <i class="fas fa-users" style="font-size: 3rem; margin-bottom: 1rem; color: var(--border-color);"></i>
+                        <p>No government employees registered yet. Please upload a CSV to seed records.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- CSV Upload Modal -->
+<div id="uploadCsvModal" style="display:none; position:fixed; z-index:1001; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,0.6); backdrop-filter: blur(4px);">
+    <div class="card" style="max-width: 550px; margin: 8% auto; padding: 2.5rem; border-top: 5px solid var(--primary-color); position: relative; animation: fadeIn 0.3s ease-out;">
+        <button type="button" style="position: absolute; right: 1.5rem; top: 1.5rem; background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--secondary-color);" onclick="document.getElementById('uploadCsvModal').style.display='none'">&times;</button>
+        
+        <h3 style="margin-bottom: 0.5rem;"><i class="fas fa-file-csv"></i> Import Employee Database</h3>
+        <p class="text-muted" style="margin-bottom: 1.5rem;">Upload the official CSV matching the required column schema to import beneficiaries in bulk.</p>
+        
+        <div style="background-color: var(--bg-alt); padding: 1rem; border-radius: var(--border-radius); border-left: 4px solid var(--warning-color); margin-bottom: 1.5rem; font-size: 0.85rem;">
+            <strong>Required Column Headers:</strong><br>
+            <code style="color: var(--danger-color);">aadhaar_number, employee_id, name, phone_number, email, department, designation</code>
+            <br><br>
+            <strong>Optional Fields:</strong> gender, age, date_of_birth, employee_type, salary, date_of_joining, policy_number, insurance_provider, claim_eligibility, medical_history
+        </div>
+
+        <form action="{{ url_for('admin.govt_database_upload') }}" method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group" style="margin-bottom: 1.5rem;">
+                <label class="form-label" style="font-weight: 700;">Select CSV File</label>
+                <input type="file" name="csv_file" class="form-control" accept=".csv" required style="padding: 1rem 0.5rem;">
+            </div>
+
+            <div style="display:flex; gap:1rem; margin-top:2rem;">
+                <button type="submit" class="btn btn-primary" style="flex:1;"><i class="fas fa-cloud-upload-alt"></i> Upload and Preview</button>
+                <button type="button" class="btn btn-secondary" style="flex:1;" onclick="document.getElementById('uploadCsvModal').style.display='none'">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

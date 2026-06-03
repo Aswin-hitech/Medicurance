@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}Submit Claim | MediCurance{% endblock %}
+
+{% block content %}
+<div class="card animate-in" style="max-width: 760px; margin: 1rem auto;">
+    <div class="card-header">
+        <div class="chip"><i class="fa-solid fa-file-circle-plus"></i> Claim intake</div>
+        <h1 style="margin-top:0.75rem;">Medical reimbursement request</h1>
+        <p class="muted">Upload the bill and supporting records in one step.</p>
+    </div>
+
+    <form action="{{ url_for('user.submit_claim') }}" method="POST" enctype="multipart/form-data" id="claimForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));">
+            <div class="form-group">
+                <label class="form-label">Patient name</label>
+                <input type="text" name="name" class="form-control" placeholder="Full name" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Hospital</label>
+                <select name="hospital" id="hospital-dropdown" class="form-control" required>
+                    <option value="">Loading hospitals...</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Claim amount</label>
+            <input type="number" name="amount" class="form-control" placeholder="25000" min="1" step="0.01" required>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Additional Information for Reviewing Officer</label>
+            <textarea
+                name="officer_note"
+                class="form-control"
+                rows="9"
+                placeholder="Provide any additional explanation, circumstances, supporting information, medical history, urgency, or comments you would like the reviewing officer to consider."></textarea>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Upload bill</label>
+            <div id="uploadZone" class="upload-dropzone">
+                <input type="file" name="bill" id="billInput" class="form-control" accept=".pdf,.jpg,.jpeg,.png" required style="margin-bottom:0.75rem;">
+                <div class="muted" id="uploadHint">Drag and drop a PDF or image, or pick a file.</div>
+                <div style="margin-top:0.9rem; background:rgba(148,163,184,0.16); border-radius:999px; overflow:hidden; height:10px;">
+                    <div id="uploadProgress" style="width:0%; height:100%; background:linear-gradient(135deg, var(--primary), var(--accent)); transition:width 0.2s ease;"></div>
+                </div>
+                <div id="previewBox" style="margin-top:1rem; display:none;">
+                    <div class="chip" id="fileNameChip"></div>
+                    <div id="filePreview" style="margin-top:0.85rem;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="toolbar">
+            <a href="{{ url_for('user.dashboard') }}" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">Submit claim</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/hospital_select.js') }}"></script>
+<script>
+    const zone = document.getElementById("uploadZone");
+    const fileInput = document.getElementById("billInput");
+    const previewBox = document.getElementById("previewBox");
+    const fileNameChip = document.getElementById("fileNameChip");
+    const filePreview = document.getElementById("filePreview");
+    const progressBar = document.getElementById("uploadProgress");
+    const claimForm = document.getElementById("claimForm");
+
+    function renderPreview(file) {
+        if (!file) return;
+        previewBox.style.display = "block";
+        fileNameChip.textContent = file.name;
+        filePreview.innerHTML = "";
+
+        if (file.type.startsWith("image/")) {
+            const img = document.createElement("img");
+            img.style.maxHeight = "280px";
+            img.style.borderRadius = "12px";
+            img.style.boxShadow = "var(--shadow-soft)";
+            img.alt = "Bill preview";
+            const reader = new FileReader();
+            reader.onload = e => img.src = e.target.result;
+            reader.readAsDataURL(file);
+            filePreview.appendChild(img);
+        } else if (file.type === "application/pdf") {
+            filePreview.innerHTML = '<div class="chip"><i class="fa-solid fa-file-pdf"></i> PDF selected</div>';
+        } else {
+            filePreview.innerHTML = '<div class="chip"><i class="fa-solid fa-circle-info"></i> File selected</div>';
+        }
+    }
+
+    fileInput.addEventListener("change", function () {
+        renderPreview(this.files[0]);
+    });
+
+    ["dragenter", "dragover"].forEach(evt => {
+        zone.addEventListener(evt, e => {
+            e.preventDefault();
+            zone.classList.add("dragover");
+        });
+    });
+    ["dragleave", "drop"].forEach(evt => {
+        zone.addEventListener(evt, e => {
+            e.preventDefault();
+            zone.classList.remove("dragover");
+        });
+    });
+    zone.addEventListener("drop", e => {
+        const file = e.dataTransfer.files[0];
+        if (file) {
+            fileInput.files = e.dataTransfer.files;
+            renderPreview(file);
+        }
+    });
+
+    claimForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+        const formData = new FormData(claimForm);
+        const xhr = new XMLHttpRequest();
+        progressBar.style.width = "8%";
+
+        xhr.upload.addEventListener("progress", function (e) {
+            if (e.lengthComputable) {
+                progressBar.style.width = `${Math.max(8, Math.min(100, Math.round((e.loaded / e.total) * 100)))}%`;
+            }
+        });
+
+        xhr.addEventListener("load", function () {
+            progressBar.style.width = "100%";
+            window.location.href = xhr.responseURL || "{{ url_for('user.claim_status') }}";
+        });
+
+        xhr.addEventListener("error", function () {
+            progressBar.style.width = "0%";
+        });
+
+        xhr.open("POST", claimForm.action, true);
+        xhr.send(formData);
+    });
+</script>
+{% endblock %}
