@@ -85,3 +85,5 @@ vectorstore/**/*  # Ensure all vectorstore contents are ignored
 uploads/
 tmp/
 temp/
+package.json
+resources\annexures
