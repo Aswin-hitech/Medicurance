@@ -1,14 +1,17 @@
 {% extends "base.html" %}
 
-{% block title %}Officer Dashboard | MediCurance{% endblock %}
+{% block title %}Officer Workspace | MediCurance{% endblock %}
 
 {% block content %}
-<div class="card animate-in">
-    <div class="toolbar" style="margin-bottom:1rem;">
+<div class="hero-shell animate-in">
+    <div class="panel-hero" style="margin-bottom:1rem;">
         <div>
-            <div class="chip"><i class="fa-solid fa-clipboard-check"></i> Review queue</div>
-            <h1 style="margin-top:0.75rem;">Officer workspace</h1>
-            <p class="muted">Review, approve, reject, or escalate claims.</p>
+            <span class="hero-topline"><i class="fa-solid fa-clipboard-check"></i> Review queue</span>
+            <h1 style="margin-top:1rem;">Officer workspace</h1>
+            <p class="muted">Review claims, inspect AI evidence, and make fast, traceable decisions.</p>
+        </div>
+        <div class="toolbar">
+            <a href="{{ url_for('officer.profile') }}" class="btn btn-secondary btn-sm"><i class="fa-solid fa-user-tie"></i> Profile</a>
         </div>
     </div>
 
@@ -19,47 +22,60 @@
         <div class="stat-card"><div class="muted">Escalated</div><div class="stat-value">{{ stats.escalated_claims if stats else 0 }}</div></div>
     </div>
 
-    {% if claims %}
-    <div class="table-wrap" style="margin-top:1rem;">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Beneficiary</th>
-                    <th>Hospital</th>
-                    <th>Amount</th>
-                    <th>Date</th>
-                    <th>Status</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for claim in claims %}
-                <tr>
-                    <td><strong>{{ claim.name }}</strong><br><span class="muted">#{{ claim.claim_id[-8:] }}</span></td>
-                    <td>{{ claim.hospital }}</td>
-                    <td>Rs. {{ "{:,.2f}".format(claim.amount) }}</td>
-                    <td>{{ claim.date }}</td>
-                    <td><span class="badge badge-{{ claim.status.lower() }}">{{ claim.status }}</span></td>
-                    <td><a class="btn btn-primary btn-sm" href="{{ url_for('officer.review_page', claim_id=claim.claim_id) }}"><i class="fa-solid fa-magnifying-glass"></i> Open</a></td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+    <div class="section-grid" style="margin-top:1rem;">
+        <div class="hero-panel" style="background: var(--surface-strong);">
+            <h3 class="gov-section-title"><i class="fa-solid fa-bolt"></i> Priority queue</h3>
+            <p class="muted">Claims needing attention stay at the top of the queue.</p>
+            {% if claims %}
+            <div class="table-wrap" style="margin-top:1rem;">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Beneficiary</th>
+                            <th>Hospital</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for claim in claims[:8] %}
+                        <tr>
+                            <td><strong>{{ claim.name }}</strong><br><span class="muted">#{{ claim.claim_id[-8:] }}</span></td>
+                            <td>{{ claim.hospital }}</td>
+                            <td>Rs. {{ "{:,.2f}".format(claim.amount) }}</td>
+                            <td><span class="badge badge-{{ claim.status.lower() }}">{{ claim.status }}</span></td>
+                            <td><a class="btn btn-primary btn-sm" href="{{ url_for('officer.review_page', claim_id=claim.claim_id) }}"><i class="fa-solid fa-magnifying-glass"></i> Review</a></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="card" style="text-align:center; margin-bottom:0;">
+                <i class="fa-solid fa-circle-check" style="font-size:3rem; color:var(--success);"></i>
+                <h3 style="margin-top:1rem;">Nothing pending</h3>
+                <p class="muted">The queue is clear for now.</p>
+            </div>
+            {% endif %}
+        </div>
 
-    {% if total_pages and total_pages > 1 %}
-    <div class="toolbar" style="margin-top:1rem; justify-content:center;">
-        <a href="{{ url_for('officer.dashboard', page=page-1, limit=limit) }}" class="btn btn-secondary btn-sm {% if page == 1 %}disabled{% endif %}">Prev</a>
-        <span class="chip">Page {{ page }} of {{ total_pages }}</span>
-        <a href="{{ url_for('officer.dashboard', page=page+1, limit=limit) }}" class="btn btn-secondary btn-sm {% if page == total_pages %}disabled{% endif %}">Next</a>
+        <aside class="hero-panel" style="background: var(--surface-strong);">
+            <h3 class="gov-section-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Review toolkit</h3>
+            <div class="insight-grid" style="margin-top:1rem;">
+                <div class="insight-card"><h3>Decision summary</h3><p class="muted">Trust, fraud, OCR, and policy are shown together.</p></div>
+                <div class="insight-card"><h3>Evidence</h3><p class="muted">Side-by-side preview keeps claim context visible.</p></div>
+                <div class="insight-card"><h3>Actions</h3><p class="muted">Approve, reject, escalate, or request documents.</p></div>
+            </div>
+
+            {% if total_pages and total_pages > 1 %}
+            <div class="toolbar" style="margin-top:1rem; justify-content:center;">
+                <a href="{{ url_for('officer.dashboard', page=page-1, limit=limit) }}" class="btn btn-secondary btn-sm {% if page == 1 %}disabled{% endif %}">Prev</a>
+                <span class="chip">Page {{ page }} of {{ total_pages }}</span>
+                <a href="{{ url_for('officer.dashboard', page=page+1, limit=limit) }}" class="btn btn-secondary btn-sm {% if page == total_pages %}disabled{% endif %}">Next</a>
+            </div>
+            {% endif %}
+        </aside>
     </div>
-    {% endif %}
-    {% else %}
-    <div class="card" style="text-align:center; margin-bottom:0;">
-        <i class="fa-solid fa-circle-check" style="font-size:3rem; color:var(--success);"></i>
-        <h3 style="margin-top:1rem;">Nothing pending</h3>
-        <p class="muted">The queue is clear for now.</p>
-    </div>
-    {% endif %}
 </div>
 {% endblock %}

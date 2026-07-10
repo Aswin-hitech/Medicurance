@@ -3,59 +3,56 @@
 {% block title %}Verify Identity | MediCurance{% endblock %}
 
 {% block content %}
-<div class="card" style="max-width: 720px; margin: 3rem auto;">
-    <div class="card-header" style="text-align: center;">
-        <h2><i class="fas fa-id-card"></i> Government Identity Verification</h2>
-        <p class="text-muted">We couldn't match your mobile number directly. Please verify your government employee record to continue.</p>
+<div class="hero-shell animate-in" style="max-width: 760px; margin: 0 auto;">
+    <div class="panel-hero">
+        <div>
+            <span class="hero-topline"><i class="fa-solid fa-id-card"></i> Identity verification</span>
+            <h1>Confirm your government employee record</h1>
+            <p class="muted">We couldn't match your mobile number directly, so please verify your official details to continue.</p>
+        </div>
     </div>
 
-    <form action="{{ url_for('auth.verify_identity_submit') }}" method="POST">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <input type="hidden" name="mobile" value="{{ mobile }}">
+    <div class="card">
+        <form action="{{ url_for('auth.verify_identity_submit') }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="mobile" value="{{ mobile }}">
 
-        <div class="form-group">
-            <label class="form-label">Aadhaar Number</label>
-            <input type="text" name="aadhaar_number" class="form-control" required maxlength="12" pattern="[0-9]{12}" placeholder="Enter 12-digit Aadhaar number">
-        </div>
+            <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+                <div class="form-group">
+                    <label class="form-label">Aadhaar Number</label>
+                    <input type="text" name="aadhaar_number" class="form-control" required maxlength="12" pattern="[0-9]{12}" placeholder="Enter 12-digit Aadhaar number">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Employee ID</label>
+                    <input type="text" name="employee_id" class="form-control" required placeholder="Enter employee ID">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Full Name</label>
+                    <input type="text" name="full_name" class="form-control" required placeholder="Enter full name as per records">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Date of Birth</label>
+                    <input type="date" name="date_of_birth" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Department</label>
+                    <input type="text" name="department" class="form-control" required placeholder="Department">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Designation</label>
+                    <input type="text" name="designation" class="form-control" required placeholder="Designation">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email <span class="muted">(optional)</span></label>
+                    <input type="email" name="email" class="form-control" placeholder="Email on record">
+                </div>
+            </div>
 
-        <div class="form-group">
-            <label class="form-label">Employee ID</label>
-            <input type="text" name="employee_id" class="form-control" required placeholder="Enter employee ID">
-        </div>
-
-        <div class="form-group">
-            <label class="form-label">Full Name</label>
-            <input type="text" name="full_name" class="form-control" required placeholder="Enter full name as per records">
-        </div>
-
-        <div class="form-group">
-            <label class="form-label">Date of Birth</label>
-            <input type="date" name="date_of_birth" class="form-control" required>
-        </div>
-
-        <div class="form-group">
-            <label class="form-label">Department</label>
-            <input type="text" name="department" class="form-control" required placeholder="Department">
-        </div>
-
-        <div class="form-group">
-            <label class="form-label">Designation</label>
-            <input type="text" name="designation" class="form-control" required placeholder="Designation">
-        </div>
-
-        <div class="form-group">
-            <label class="form-label">Email <span class="text-muted">(optional)</span></label>
-            <input type="email" name="email" class="form-control" placeholder="Email on record">
-        </div>
-
-        <div style="margin-top: 2rem;">
-            <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.8rem;">
-                Verify Identity
-            </button>
-            <a href="{{ url_for('auth.login') }}" class="btn btn-secondary" style="width: 100%; margin-top: 0.75rem; padding: 0.8rem;">
-                Cancel and Return to Login
-            </a>
-        </div>
-    </form>
+            <div class="toolbar" style="margin-top:1.5rem; justify-content:space-between;">
+                <a href="{{ url_for('auth.login') }}" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">Verify identity</button>
+            </div>
+        </form>
+    </div>
 </div>
 {% endblock %}

@@ -3,62 +3,94 @@
 {% block title %}Submit Claim | MediCurance{% endblock %}
 
 {% block content %}
-<div class="card animate-in" style="max-width: 760px; margin: 1rem auto;">
-    <div class="card-header">
-        <div class="chip"><i class="fa-solid fa-file-circle-plus"></i> Claim intake</div>
-        <h1 style="margin-top:0.75rem;">Medical reimbursement request</h1>
-        <p class="muted">Upload the bill and supporting records in one step.</p>
+<div class="hero-shell animate-in">
+    <div class="panel-hero" style="margin-bottom:1rem;">
+        <div>
+            <span class="hero-topline"><i class="fa-solid fa-file-circle-plus"></i> Claim intake</span>
+            <h1 style="margin-top:1rem;">Submit a reimbursement request</h1>
+            <p class="muted">Upload a bill, preview the file, and add officer notes in one streamlined flow.</p>
+        </div>
+        <div class="metric-ring" style="--percent: 72%;">
+            <span>3 steps</span>
+        </div>
     </div>
 
-    <form action="{{ url_for('user.submit_claim') }}" method="POST" enctype="multipart/form-data" id="claimForm">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));">
-            <div class="form-group">
-                <label class="form-label">Patient name</label>
-                <input type="text" name="name" class="form-control" placeholder="Full name" required>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Hospital</label>
-                <select name="hospital" id="hospital-dropdown" class="form-control" required>
-                    <option value="">Loading hospitals...</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label class="form-label">Claim amount</label>
-            <input type="number" name="amount" class="form-control" placeholder="25000" min="1" step="0.01" required>
-        </div>
-
-        <div class="form-group">
-            <label class="form-label">Additional Information for Reviewing Officer</label>
-            <textarea
-                name="officer_note"
-                class="form-control"
-                rows="9"
-                placeholder="Provide any additional explanation, circumstances, supporting information, medical history, urgency, or comments you would like the reviewing officer to consider."></textarea>
-        </div>
-
-        <div class="form-group">
-            <label class="form-label">Upload bill</label>
-            <div id="uploadZone" class="upload-dropzone">
-                <input type="file" name="bill" id="billInput" class="form-control" accept=".pdf,.jpg,.jpeg,.png" required style="margin-bottom:0.75rem;">
-                <div class="muted" id="uploadHint">Drag and drop a PDF or image, or pick a file.</div>
-                <div style="margin-top:0.9rem; background:rgba(148,163,184,0.16); border-radius:999px; overflow:hidden; height:10px;">
-                    <div id="uploadProgress" style="width:0%; height:100%; background:linear-gradient(135deg, var(--primary), var(--accent)); transition:width 0.2s ease;"></div>
+    <div class="hero-grid" style="grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.7fr);">
+        <section class="hero-panel" style="background: var(--surface-strong);">
+            <form action="{{ url_for('user.submit_claim') }}" method="POST" enctype="multipart/form-data" id="claimForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));">
+                    <div class="form-group">
+                        <label class="form-label">Patient name</label>
+                        <input type="text" name="name" class="form-control" placeholder="Full name" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Claim amount</label>
+                        <input type="number" name="amount" class="form-control" placeholder="25000" min="1" step="0.01" required>
+                    </div>
                 </div>
-                <div id="previewBox" style="margin-top:1rem; display:none;">
+
+                <div class="form-group">
+                    <label class="form-label">Hospital</label>
+                    <select name="hospital" id="hospital-dropdown" class="form-control" required>
+                        <option value="">Loading hospitals...</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Additional information for reviewing officer</label>
+                    <textarea
+                        name="officer_note"
+                        class="form-control"
+                        rows="8"
+                        placeholder="Add any supporting explanation, urgency, or clarification for the officer."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Medical bill</label>
+                    <div id="uploadZone" class="upload-dropzone">
+                        <div class="upload-copy">
+                            <strong>Drag and drop your document here</strong>
+                            <span class="muted">PDF, JPG, JPEG, or PNG. Preview updates instantly.</span>
+                        </div>
+                        <input type="file" name="bill" id="billInput" class="form-control" accept=".pdf,.jpg,.jpeg,.png" required style="margin-top:1rem;">
+                        <div class="skeleton" style="margin-top:0.9rem; height:10px; border-radius:999px;">
+                            <div id="uploadProgress" style="width:0%; height:100%; border-radius:999px; background:linear-gradient(135deg, var(--primary), var(--accent)); transition:width 0.2s ease;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="toolbar">
+                    <a href="{{ url_for('user.dashboard') }}" class="btn btn-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary">Submit claim</button>
+                </div>
+            </form>
+        </section>
+
+        <aside class="hero-panel" style="background: var(--surface-strong);">
+            <div class="card-header">
+                <div class="chip"><i class="fa-solid fa-magnifying-glass"></i> Live preview</div>
+                <h2 style="margin-top:0.75rem;">Document viewer</h2>
+                <p class="muted">Preview the uploaded document before you submit.</p>
+            </div>
+
+            <div id="previewBox" class="preview-box" style="display:none;">
+                <div style="padding:1rem;">
                     <div class="chip" id="fileNameChip"></div>
-                    <div id="filePreview" style="margin-top:0.85rem;"></div>
+                    <div id="filePreview" style="margin-top:0.9rem;"></div>
                 </div>
             </div>
-        </div>
 
-        <div class="toolbar">
-            <a href="{{ url_for('user.dashboard') }}" class="btn btn-secondary">Cancel</a>
-            <button type="submit" class="btn btn-primary">Submit claim</button>
-        </div>
-    </form>
+            <div class="card" style="margin-top:1rem; margin-bottom:0; background: var(--bg-elevated);">
+                <h3>Checklist</h3>
+                <ul style="margin:0; padding-left:1.2rem;" class="muted">
+                    <li>Use a clear, legible bill image or PDF.</li>
+                    <li>Ensure the hospital name matches the selected entry.</li>
+                    <li>Add notes if the claim needs context for review.</li>
+                </ul>
+            </div>
+        </aside>
+    </div>
 </div>
 {% endblock %}
 
@@ -82,7 +114,7 @@
         if (file.type.startsWith("image/")) {
             const img = document.createElement("img");
             img.style.maxHeight = "280px";
-            img.style.borderRadius = "12px";
+            img.style.borderRadius = "16px";
             img.style.boxShadow = "var(--shadow-soft)";
             img.alt = "Bill preview";
             const reader = new FileReader();

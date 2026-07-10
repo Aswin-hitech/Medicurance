@@ -3,14 +3,17 @@
 {% block title %}Profile | MediCurance{% endblock %}
 
 {% block content %}
-<div class="card animate-in">
-    <div class="toolbar" style="margin-bottom:1rem;">
+<div class="hero-shell animate-in">
+    <div class="panel-hero">
         <div>
-            <div class="chip"><i class="fa-solid fa-user"></i> Profile</div>
-            <h1 style="margin-top:0.75rem;">{{ employee.get('name') or user.get('name') or mobile }}</h1>
-            <p class="muted">{% if employee.get('employee_id') %}Verified government employee{% else %}Account overview{% endif %}</p>
+            <span class="hero-topline"><i class="fa-solid fa-user"></i> Account profile</span>
+            <h1>{{ employee.get('name') or user.get('name') or mobile }}</h1>
+            <p class="muted">{% if employee.get('employee_id') %}Verified government employee linked to the platform{% else %}Account overview and security details{% endif %}</p>
         </div>
-        <span class="badge {% if employee.get('employee_id') %}badge-approved{% else %}badge-pending{% endif %}">{% if employee.get('employee_id') %}Linked{% else %}Unverified{% endif %}</span>
+        <div class="toolbar">
+            <span class="badge {% if employee.get('employee_id') %}badge-approved{% else %}badge-pending{% endif %}">{% if employee.get('employee_id') %}Linked{% else %}Unverified{% endif %}</span>
+            <a href="{{ url_for('auth.forgot_password') }}" class="btn btn-secondary btn-sm"><i class="fa-solid fa-key"></i> Reset password</a>
+        </div>
     </div>
 
     <div class="stats-row">
@@ -32,39 +35,59 @@
         </div>
     </div>
 
-    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-top:1rem;">
-        <div class="card" style="margin-bottom:0;">
-            <h3>Account</h3>
-            <p><strong>Mobile:</strong> {{ mobile }}</p>
-            <p><strong>Status:</strong> Active</p>
-            <p><strong>Role:</strong> {{ session.get('role', 'user')|title }}</p>
-        </div>
-        <div class="card" style="margin-bottom:0;">
-            <h3>Security</h3>
-            <p class="muted">Keep your password updated when needed.</p>
-            <a href="{{ url_for('auth.forgot_password') }}" class="btn btn-secondary"><i class="fa-solid fa-key"></i> Reset password</a>
-        </div>
-    </div>
+    <div class="section-grid" style="margin-top:1rem;">
+        <div class="hero-panel" style="background: var(--surface-strong);">
+            <div class="card">
+                <div class="section-heading">
+                    <div>
+                        <span class="section-kicker">Account</span>
+                        <h3>Identity and access</h3>
+                    </div>
+                </div>
+                <p><strong>Mobile:</strong> {{ mobile }}</p>
+                <p><strong>Status:</strong> Active</p>
+                <p><strong>Role:</strong> {{ session.get('role', 'user')|title }}</p>
+            </div>
 
-    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-top:1rem;">
-        <div class="card">
-            <h3>Employment</h3>
-            <p><strong>Employee ID:</strong> {{ employee.get('employee_id') or user.get('employee_id') or 'N/A' }}</p>
-            <p><strong>Department:</strong> {{ employee.get('department') or user.get('department') or 'N/A' }}</p>
-            <p><strong>Designation:</strong> {{ employee.get('designation') or user.get('designation') or 'N/A' }}</p>
-            <p><strong>District:</strong> {{ employee.get('district') or user.get('district') or 'N/A' }}</p>
+            <div class="card">
+                <div class="section-heading">
+                    <div>
+                        <span class="section-kicker">Employment</span>
+                        <h3>Government record</h3>
+                    </div>
+                </div>
+                <p><strong>Employee ID:</strong> {{ employee.get('employee_id') or user.get('employee_id') or 'N/A' }}</p>
+                <p><strong>Department:</strong> {{ employee.get('department') or user.get('department') or 'N/A' }}</p>
+                <p><strong>Designation:</strong> {{ employee.get('designation') or user.get('designation') or 'N/A' }}</p>
+                <p><strong>District:</strong> {{ employee.get('district') or user.get('district') or 'N/A' }}</p>
+            </div>
         </div>
-        <div class="card">
-            <h3>Insurance</h3>
-            <p><strong>Policy:</strong> {{ employee.get('policy_number') or user.get('policy_number') or 'N/A' }}</p>
-            <p><strong>Provider:</strong> {{ employee.get('insurance_provider') or user.get('insurance_provider') or 'N/A' }}</p>
-            <p><strong>Eligibility:</strong> {{ employee.get('claim_eligibility') or user.get('claim_eligibility') or 'N/A' }}</p>
-            <p><strong>Blood group:</strong> {{ employee.get('blood_group') or user.get('blood_group') or 'N/A' }}</p>
-        </div>
-    </div>
 
-    <div style="margin-top:1rem;">
-        <a href="{{ url_for('user.dashboard') }}" class="btn btn-primary"><i class="fa-solid fa-arrow-left"></i> Back</a>
+        <aside class="hero-panel" style="background: var(--surface-strong);">
+            <div class="card">
+                <div class="section-heading">
+                    <div>
+                        <span class="section-kicker">Insurance</span>
+                        <h3>Coverage details</h3>
+                    </div>
+                </div>
+                <p><strong>Policy:</strong> {{ employee.get('policy_number') or user.get('policy_number') or 'N/A' }}</p>
+                <p><strong>Provider:</strong> {{ employee.get('insurance_provider') or user.get('insurance_provider') or 'N/A' }}</p>
+                <p><strong>Eligibility:</strong> {{ employee.get('claim_eligibility') or user.get('claim_eligibility') or 'N/A' }}</p>
+                <p><strong>Blood group:</strong> {{ employee.get('blood_group') or user.get('blood_group') or 'N/A' }}</p>
+            </div>
+
+            <div class="card">
+                <div class="section-heading">
+                    <div>
+                        <span class="section-kicker">Next steps</span>
+                        <h3>Keep your profile current</h3>
+                    </div>
+                </div>
+                <p class="muted">If any employment or insurance detail changes, refresh your records before submitting a new reimbursement request.</p>
+                <a href="{{ url_for('user.dashboard') }}" class="btn btn-primary btn-sm"><i class="fa-solid fa-arrow-left"></i> Back to dashboard</a>
+            </div>
+        </aside>
     </div>
 </div>
 {% endblock %}

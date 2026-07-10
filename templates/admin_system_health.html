@@ -3,15 +3,15 @@
 {% block title %}System Health | MediCurance{% endblock %}
 
 {% block content %}
-<div class="card animate-in">
-    <div class="toolbar" style="margin-bottom:1rem;">
+<div class="hero-shell animate-in">
+    <div class="panel-hero">
         <div>
-            <div class="chip"><i class="fa-solid fa-heart-pulse"></i> Platform health</div>
-            <h1 style="margin-top:0.75rem;">System readiness</h1>
-            <p class="muted">A quick operational view of core services, assets, and configuration.</p>
+            <span class="hero-topline"><i class="fa-solid fa-heart-pulse"></i> Platform readiness</span>
+            <h1>System health and deployment checks</h1>
+            <p class="muted">A quick view of database connectivity, AI readiness, storage configuration, and operational assets.</p>
         </div>
         <div class="toolbar">
-            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary btn-sm"><i class="fa-solid fa-arrow-left"></i> Back</a>
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary btn-sm"><i class="fa-solid fa-arrow-left"></i> Back to admin</a>
         </div>
     </div>
 
@@ -21,31 +21,33 @@
         <div class="stat-card"><div class="muted">Degraded</div><div class="stat-value">{{ summary.degraded }}</div></div>
     </div>
 
-    <div class="table-wrap" style="margin-top:1rem;">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Subsystem</th>
-                    <th>Category</th>
-                    <th>Status</th>
-                    <th>Details</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in checks %}
-                <tr>
-                    <td><strong>{{ item.name }}</strong></td>
-                    <td>{{ item.category }}</td>
-                    <td>
-                        <span class="badge badge-{{ 'approved' if item.status in ['Healthy', 'Configured'] else 'rejected' if item.status == 'Missing' else 'pending' }}">
-                            {{ item.status }}
-                        </span>
-                    </td>
-                    <td class="muted">{{ item.details }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    <div class="card" style="margin-top:1rem;">
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Subsystem</th>
+                        <th>Category</th>
+                        <th>Status</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in checks %}
+                    <tr>
+                        <td><strong>{{ item.name }}</strong></td>
+                        <td>{{ item.category }}</td>
+                        <td>
+                            <span class="badge badge-{{ 'approved' if item.status in ['Healthy', 'Configured'] else 'rejected' if item.status == 'Missing' else 'pending' }}">
+                                {{ item.status }}
+                            </span>
+                        </td>
+                        <td class="muted">{{ item.details }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 {% endblock %}

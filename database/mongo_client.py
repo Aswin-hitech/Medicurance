@@ -132,6 +132,9 @@ admins_collection = db["admins"]
 audit_logs_collection = db["audit_logs"]
 claim_logs_collection = db["claim_logs"]
 notifications_collection = db["notifications"]
+token_revocations_collection = db["token_revocations"]
+claim_versions_collection = db["claim_versions"]
+email_verifications_collection = db["email_verifications"]
 
 # Advanced Indexing
 if MONGO_AVAILABLE:
@@ -167,6 +170,14 @@ if MONGO_AVAILABLE:
     _safe_create_index(audit_logs_collection, "actor")
     _safe_create_index(claim_logs_collection, "claim_id")
     _safe_create_index(claim_logs_collection, "timestamp")
+    _safe_create_index(token_revocations_collection, "jti_hash", unique=True)
+    _safe_create_index(token_revocations_collection, "expires_at")
+    _safe_create_index(claim_versions_collection, "claim_id")
+    _safe_create_index(claim_versions_collection, "version")
+    _safe_create_index(claim_versions_collection, "created_at")
+    _safe_create_index(email_verifications_collection, "token_hash", unique=True)
+    _safe_create_index(email_verifications_collection, "email")
+    _safe_create_index(email_verifications_collection, "expires_at")
     _safe_create_index(notifications_collection, "claim_id")
     _safe_create_index(notifications_collection, "created_at")
 

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from database.mongo_client import claims_collection, notifications_collection
+from database.mongo_client import claim_versions_collection, claims_collection, notifications_collection
 from utils.logger import log_audit, log_claim_state
 
 ALLOWED_STATUSES = {"Pending", "Approved", "Rejected", "Escalated"}
@@ -35,6 +35,14 @@ def record_claim_status_change(claim_id, old_status, new_status, actor, reason=N
         {"claim_id": claim_id},
         {"$set": update_doc}
     )
+    updated_claim = claims_collection.find_one({"claim_id": claim_id}) or {}
+    claim_versions_collection.insert_one({
+        **updated_claim,
+        "event": "status_changed",
+        "actor": actor,
+        "reason": reason,
+        "created_at": now,
+    })
 
     log_claim_state(
         claim_id=claim_id,

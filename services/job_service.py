@@ -10,7 +10,7 @@ def enqueue_claim_processing(claim_id):
     Optional RQ-based background hook. If Redis/RQ is not configured, callers
     can safely continue with synchronous processing.
     """
-    if not getattr(Config, "CLAIM_PROCESSING_ASYNC", False):
+    if not (getattr(Config, "CLAIM_PROCESSING_ASYNC", False) or getattr(Config, "ENABLE_BACKGROUND_JOBS", False)):
         return {"queued": False, "reason": "async_disabled"}
 
     try:

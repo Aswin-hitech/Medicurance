@@ -2,9 +2,8 @@ from flask import Blueprint, flash, redirect, render_template, request, send_fil
 from utils.auth_utils import role_required
 
 from database.mongo_client import claims_collection, users_collection
-from database.hospital_repository import get_all_hospitals, verify_hospital
+from database.hospital_repository import get_all_hospitals
 from database.claim_repository import get_claims_by_user
-from datetime import datetime, timezone
 from utils.status_utils import normalize_claim_status
 from services.claim_processing_service import ClaimProcessingService
 from services.auth_service import resolve_role
@@ -29,9 +28,6 @@ def claim_request():
 @limit_route("10 per hour", redirect_endpoint="user.claim_request", message="Too many claim submissions. Please try again later.")
 def submit_claim():
     mobile = session["mobile"]
-    name = request.form.get("name")
-    hospital = request.form.get("hospital")
-    amount = request.form.get("amount")
 
     user_doc = users_collection.find_one({"mobile": mobile}) or {}
     if not user_doc.get("is_government_employee"):
@@ -47,78 +43,22 @@ def submit_claim():
     service = ClaimProcessingService(mobile, request.form, file)
 
     try:
-        is_valid, error = service.validate_upload()
-        if not is_valid:
-            flash(error, "danger")
-            return redirect(url_for('user.claim_request'))
+        result = service.process_claim()
+        if not result.get("ok"):
+            flash(result.get("message", "Unable to submit claim."), "danger")
+            return redirect(url_for("user.claim_request"))
 
-        hospital_check = verify_hospital(hospital)
-        if not hospital_check["exists"]:
-            flash(f"Invalid hospital selected: {hospital}", "danger")
-            return redirect(url_for('user.claim_request'))
-
-        url = service.upload_document()
-        ocr_result = service.run_ocr()
-        text = ocr_result.get("text", "")
-        ocr_confidence = ocr_result.get("ocr_confidence", 0.0)
-        page_count = ocr_result.get("page_count", 1)
-
-        # Validate claim against OCR text and extracted entities
-        entities = service.extract_entities(text)
-        fraud_result = service.detect_fraud(amount, hospital, text)
-        service.context["duplicate_result"] = fraud_result.get("duplicate_result", {})
-        entities.update({
-            key: value
-            for key, value in service.context["duplicate_result"].items()
-            if key in {"invoice_number", "admission_date", "discharge_date"} and value
-        })
-        _, ai_result = service.validate_claim(hospital, text, entities)
-        rag_result = service.verify_government_rules(text, entities)
-
-        if isinstance(ai_result, dict):
-            ai_result.setdefault("fraud_flags", [])
-            if isinstance(ai_result["fraud_flags"], list):
-                ai_result["fraud_flags"].extend(fraud_result.get("fraud_flags", []))
-            ai_result["system_risk_score"] = fraud_result["fraud_score"]
-            ai_result["system_risk_level"] = fraud_result["fraud_level"]
-
-        trust_result = service.calculate_trust(
-            hospital=hospital,
-            ai_confidence=ai_result.get("confidence", 0.0),
-            ocr_confidence=ocr_confidence / 100.0,
-            image_hash=fraud_result["image_hash"]
-        )
-
-        claim_doc = service.persist_claim({
-            "name": name,
-            "hospital": hospital,
-            "amount": amount,
-            "bill_url": url,
-            "extracted_text": text,
-            "entities": entities,
-            "image_hash": fraud_result["image_hash"],
-            "duplicate_hash": fraud_result.get("duplicate_hash"),
-            "duplicate_result": fraud_result.get("duplicate_result", {}),
-            "ai_result": ai_result,
-            "fraud_result": fraud_result,
-            "trust_result": trust_result,
-            "rag_result": rag_result,
-            "officer_note": request.form.get("officer_note", "").strip(),
-            "citizen_remarks_submitted_at": datetime.now(timezone.utc).isoformat() if request.form.get("officer_note", "").strip() else None,
-            "status": "Pending",
-            "confidence_score": ai_result.get("confidence", 0.0),
-            "ocr_confidence": ocr_confidence,
-            "trust_score": trust_result.get("score", 0.0),
-            "trust_level": trust_result.get("level", "LOW"),
-            "fraud_level": fraud_result.get("fraud_level", "LOW"),
-            "ocr_page_count": page_count,
-        })
-
-        flash("Claim submitted successfully for review.", "success")
+        decision = result.get("decision", "Pending")
+        if decision == "Approve":
+            flash("Claim approved by the agentic workflow.", "success")
+        elif decision == "Reject":
+            flash("Claim rejected by the agentic workflow.", "warning")
+        elif decision == "Request Additional Documents":
+            flash("Additional documents are required before the claim can move forward.", "warning")
+        else:
+            flash("Claim submitted successfully for officer review.", "success")
     except Exception as e:
         flash(f"Error processing claim: {str(e)}", "danger")
-    finally:
-        service.cleanup()
 
     return redirect(url_for('user.claim_status'))
 

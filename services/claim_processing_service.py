@@ -2,17 +2,19 @@ import os
 import tempfile
 import uuid
 from datetime import datetime, timezone
+from typing import Any
 
+from agents.orchestrator_agent import get_orchestrator_agent
 from database.mongo_client import claims_collection
-from database.hospital_repository import verify_hospital
-from services.fraud_service import detect_fraud as detect_fraud_engine
-from services.ocr_service import extract_text_advanced
-from services.rag_service import rag_validate, retrieve_rules
 from services.storage_service import upload_file as upload_to_storage
-from services.trust_service import calculate_trust_score
+from memory.claim_memory import ClaimMemory
 from utils.security_utils import validate_file_upload
 from utils.status_utils import normalize_claim_status
-from utils.logger import log_claim_state
+from utils.logger import log_claim_state, logger
+
+
+class ClaimProcessingError(RuntimeError):
+    """Raised when the claim workflow cannot complete gracefully."""
 
 
 class ClaimProcessingService:
@@ -23,6 +25,7 @@ class ClaimProcessingService:
         self.temp_path = None
         self.claim_id = str(uuid.uuid4())
         self.context = {}
+        self.orchestrator = get_orchestrator_agent()
 
     def validate_upload(self):
         is_valid, error, sanitized_filename = validate_file_upload(self.uploaded_file)
@@ -38,6 +41,8 @@ class ClaimProcessingService:
         return upload_to_storage(self.temp_path)
 
     def run_ocr(self):
+        from services.ocr_service import extract_text_advanced
+
         return extract_text_advanced(self.temp_path)
 
     def extract_entities(self, text):
@@ -45,9 +50,14 @@ class ClaimProcessingService:
         return extract_entities(text)
 
     def detect_fraud(self, amount, hospital, extracted_text):
+        from services.fraud_service import detect_fraud as detect_fraud_engine
+
         return detect_fraud_engine(self.mobile, amount, hospital, self.temp_path, extracted_text)
 
     def validate_claim(self, hospital, extracted_text, entities):
+        from database.hospital_repository import verify_hospital
+        from services.rag_service import rag_validate
+
         hospital_check = verify_hospital(hospital)
         ai_result = rag_validate(extracted_text, entities=entities)
         if not isinstance(ai_result, dict):
@@ -67,6 +77,8 @@ class ClaimProcessingService:
         return hospital_check, ai_result
 
     def verify_government_rules(self, extracted_text, entities):
+        from services.rag_service import retrieve_rules
+
         entities = entities or {}
         query_parts = [
             entities.get("surgery"),
@@ -101,6 +113,8 @@ class ClaimProcessingService:
         }
 
     def calculate_trust(self, hospital, ai_confidence, ocr_confidence, image_hash):
+        from services.trust_service import calculate_trust_score
+
         return calculate_trust_score(
             mobile=self.mobile,
             hospital_name=hospital,
@@ -108,6 +122,30 @@ class ClaimProcessingService:
             ocr_confidence=ocr_confidence,
             image_hash=image_hash,
             duplicate_result=self.context.get("duplicate_result"),
+        )
+
+    def build_memory(self, bill_url: str = "") -> ClaimMemory:
+        amount_value = self.form_data.get("amount", 0)
+        try:
+            amount = float(amount_value or 0)
+        except (TypeError, ValueError):
+            amount = 0.0
+        officer_note = str(self.form_data.get("officer_note", "") or "").strip()
+        citizen_remarks_submitted_at = (
+            datetime.now(timezone.utc).isoformat() if officer_note else None
+        )
+        return ClaimMemory(
+            claim_id=self.claim_id,
+            mobile=self.mobile,
+            name=str(self.form_data.get("name", "")).strip(),
+            hospital=str(self.form_data.get("hospital", "")).strip(),
+            amount=amount,
+            bill_url=bill_url,
+            temp_path=self.temp_path or "",
+            form_data={
+                "officer_note": officer_note,
+                "citizen_remarks_submitted_at": citizen_remarks_submitted_at,
+            },
         )
 
     def persist_claim(self, payload):
@@ -142,10 +180,56 @@ class ClaimProcessingService:
             "created_at": now,
             "updated_at": now,
             "ocr_page_count": payload.get("ocr_page_count", 0),
+            "agent_trace": payload.get("agent_trace", []),
+            "reflection_notes": payload.get("reflection_notes", []),
+            "final_decision": payload.get("final_decision", payload.get("decision", "")),
+            "recommendation": payload.get("recommendation", {}),
+            "policy_clauses": payload.get("policy_clauses", []),
+            "source_references": payload.get("source_references", []),
+            "reasoning_summaries": payload.get("reasoning_summaries", {}),
+            "intermediate_decisions": payload.get("intermediate_decisions", []),
+            "workflow_metadata": payload.get("workflow_metadata", {}),
+            "retries": payload.get("retries", {}),
+            "errors": payload.get("errors", []),
         }
         claims_collection.insert_one(claim_doc)
         log_claim_state(self.claim_id, "None", claim_doc["status"], self.mobile, "Claim submitted")
         return claim_doc
+
+    def process_claim(self):
+        is_valid, error = self.validate_upload()
+        if not is_valid:
+            return {"ok": False, "message": error, "claim_id": self.claim_id}
+
+        try:
+            bill_url = self.upload_document() or self.temp_path or ""
+            workflow_memory = self.build_memory(bill_url=bill_url)
+            result_memory = self.orchestrator.execute(workflow_memory)
+            claim_doc = self.persist_claim(result_memory.to_claim_document())
+
+            decision = result_memory.decision or claim_doc.get("final_decision") or claim_doc.get("status")
+            if decision == "Approve":
+                message = "Claim approved by the agentic workflow."
+            elif decision == "Reject":
+                message = "Claim rejected by the agentic workflow."
+            elif decision == "Request Additional Documents":
+                message = "Additional documents are required before the claim can proceed."
+            else:
+                message = "Claim escalated for officer review."
+
+            return {
+                "ok": True,
+                "claim_id": claim_doc["claim_id"],
+                "status": claim_doc["status"],
+                "decision": claim_doc.get("final_decision", decision),
+                "message": message,
+                "claim": claim_doc,
+            }
+        except Exception as exc:
+            logger.exception("[ClaimProcessing] Agentic workflow failed: %s", exc)
+            raise ClaimProcessingError(str(exc)) from exc
+        finally:
+            self.cleanup()
 
     def cleanup(self):
         if self.temp_path and os.path.exists(self.temp_path):

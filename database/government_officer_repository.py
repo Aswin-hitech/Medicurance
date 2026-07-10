@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 import re
 from datetime import datetime, timezone
-
-from database.mongo_client import officers_collection
+from typing import Any, Dict, Optional
 
 
 def _normalize_digits(value):
@@ -105,159 +106,202 @@ def _officer_query(identifier):
         ]
     }
 
-def add_officer(officer_data):
-    """
-    Adds a new government officer.
-    """
-    payload = _normalize_officer_payload(officer_data)
-    identifier = _normalize_identifier(
-        payload.get("officer_id")
-        or payload.get("employee_id")
-        or payload.get("email")
-        or payload.get("phone_number")
-        or payload.get("phone")
-        or payload.get("mobile")
-    )
-    if not identifier:
-        raise ValueError("Officer identifier is required")
 
-    if not payload.get("officer_id"):
-        payload["officer_id"] = payload.get("employee_id") or payload.get("phone_number") or identifier
-    if not payload.get("employee_id"):
-        payload["employee_id"] = payload.get("officer_id")
+class GovernmentOfficerRepository:
+    def __init__(self, db):
+        self.db = db
 
-    query = _officer_query(identifier)
-    officers_collection.update_one(query if query else {"officer_id": payload.get("officer_id")}, {"$set": payload}, upsert=True)
-    return officers_collection.find_one(query if query else {"officer_id": payload.get("officer_id")})
+    def add_officer(self, officer_data):
+        """
+        Adds a new government officer.
+        """
+        payload = _normalize_officer_payload(officer_data)
+        identifier = _normalize_identifier(
+            payload.get("officer_id")
+            or payload.get("employee_id")
+            or payload.get("email")
+            or payload.get("phone_number")
+            or payload.get("phone")
+            or payload.get("mobile")
+        )
+        if not identifier:
+            raise ValueError("Officer identifier is required")
 
+        if not payload.get("officer_id"):
+            payload["officer_id"] = payload.get("employee_id") or payload.get("phone_number") or identifier
+        if not payload.get("employee_id"):
+            payload["employee_id"] = payload.get("officer_id")
 
-def create_officer_account(officer_data):
-    """
-    Create or update a login-enabled officer account in the officers collection.
-    """
-    payload = _normalize_officer_payload(officer_data)
-    payload.setdefault("role", "officer")
-    payload.setdefault("is_disabled", False)
-    payload.setdefault("is_deleted", False)
-    payload.setdefault("created_at", datetime.now(timezone.utc).isoformat())
-    payload["updated_at"] = datetime.now(timezone.utc).isoformat()
+        query = _officer_query(identifier)
+        self.db["government_officers"].update_one(query if query else {"officer_id": payload.get("officer_id")}, {"$set": payload}, upsert=True)
+        return self.db["government_officers"].find_one(query if query else {"officer_id": payload.get("officer_id")})
 
-    identifier = _normalize_identifier(
-        payload.get("officer_id")
-        or payload.get("employee_id")
-        or payload.get("email")
-        or payload.get("phone_number")
-        or payload.get("phone")
-        or payload.get("mobile")
-    )
-    if not identifier:
-        raise ValueError("Officer identifier is required")
+    def create_officer_account(self, officer_data):
+        """
+        Create or update a login-enabled officer account in the officers collection.
+        """
+        payload = _normalize_officer_payload(officer_data)
+        payload.setdefault("role", "officer")
+        payload.setdefault("is_disabled", False)
+        payload.setdefault("is_deleted", False)
+        payload.setdefault("created_at", datetime.now(timezone.utc).isoformat())
+        payload["updated_at"] = datetime.now(timezone.utc).isoformat()
 
-    if not payload.get("officer_id"):
-        payload["officer_id"] = payload.get("employee_id") or payload.get("phone_number") or identifier
-    if not payload.get("employee_id"):
-        payload["employee_id"] = payload.get("officer_id")
+        identifier = _normalize_identifier(
+            payload.get("officer_id")
+            or payload.get("employee_id")
+            or payload.get("email")
+            or payload.get("phone_number")
+            or payload.get("phone")
+            or payload.get("mobile")
+        )
+        if not identifier:
+            raise ValueError("Officer identifier is required")
 
-    query = _officer_query(identifier)
-    officers_collection.update_one(
-        query if query else {"officer_id": payload.get("officer_id")},
-        {"$set": payload},
-        upsert=True
-    )
-    return officers_collection.find_one(query if query else {"officer_id": payload.get("officer_id")})
+        if not payload.get("officer_id"):
+            payload["officer_id"] = payload.get("employee_id") or payload.get("phone_number") or identifier
+        if not payload.get("employee_id"):
+            payload["employee_id"] = payload.get("officer_id")
 
-def delete_officer(officer_id):
-    """
-    Deletes an officer by officer_id.
-    """
-    if not officer_id:
-        return None
-    result = officers_collection.delete_one({
-        "$or": [
-            {"officer_id": str(officer_id).strip()},
-            {"employee_id": str(officer_id).strip()},
-        ]
-    })
-    return result.deleted_count
+        query = _officer_query(identifier)
+        self.db["government_officers"].update_one(
+            query if query else {"officer_id": payload.get("officer_id")},
+            {"$set": payload},
+            upsert=True
+        )
+        return self.db["government_officers"].find_one(query if query else {"officer_id": payload.get("officer_id")})
 
-def update_officer(officer_id, update_data):
-    """
-    Updates an officer by officer_id.
-    """
-    if not officer_id:
-        return None
-    update_data = _normalize_officer_update_data(update_data)
-    result = officers_collection.update_one(
-        {
+    def delete_officer(self, officer_id):
+        """
+        Deletes an officer by officer_id.
+        """
+        if not officer_id:
+            return None
+        result = self.db["government_officers"].delete_one({
             "$or": [
                 {"officer_id": str(officer_id).strip()},
                 {"employee_id": str(officer_id).strip()},
             ]
-        },
-        {"$set": update_data}
-    )
-    return result.modified_count
+        })
+        return result.deleted_count
+
+    def update_officer(self, officer_id, update_data):
+        """
+        Updates an officer by officer_id.
+        """
+        if not officer_id:
+            return None
+        update_data = _normalize_officer_update_data(update_data)
+        result = self.db["government_officers"].update_one(
+            {
+                "$or": [
+                    {"officer_id": str(officer_id).strip()},
+                    {"employee_id": str(officer_id).strip()},
+                ]
+            },
+            {"$set": update_data}
+        )
+        return result.modified_count
+
+    def search_officer(self, query=None, department=None, district=None):
+        """
+        Searches officers with search query text and optional filters.
+        """
+        find_query = {}
+        
+        if query:
+            search_regex = {"$regex": str(query), "$options": "i"}
+            digit_values = _digit_query_values(query)
+            find_query["$or"] = [
+                {"name": search_regex},
+                {"officer_id": search_regex},
+                {"employee_id": search_regex},
+                {"designation": search_regex},
+                {"phone": search_regex},
+                {"phone_number": search_regex},
+                {"email": search_regex}
+            ]
+            if digit_values:
+                find_query["$or"].extend([
+                    {"phone": {"$in": digit_values}},
+                    {"phone_number": {"$in": digit_values}},
+                    {"mobile": {"$in": digit_values}},
+                ])
+            
+        if department:
+            find_query["department"] = department
+            
+        if district:
+            find_query["district"] = district
+            
+        return list(self.db["government_officers"].find(find_query))
+
+    def get_all_officers(self):
+        """
+        Retrieves all government officers.
+        """
+        return list(self.db["government_officers"].find())
+
+    def get_officer_by_identifier(self, identifier):
+        """
+        Fetch an officer by email, mobile/phone, employee_id, or officer_id.
+        """
+        normalized = _normalize_identifier(identifier)
+        if not normalized:
+            return None
+
+        if "@" in normalized:
+            return self.db["government_officers"].find_one({"email": normalized})
+
+        digit_values = _digit_query_values(normalized)
+        return self.db["government_officers"].find_one(
+            {
+                "$or": [
+                    {"employee_id": normalized},
+                    {"officer_id": normalized},
+                    {"phone": {"$in": digit_values}},
+                    {"mobile": {"$in": digit_values}},
+                    {"phone_number": {"$in": digit_values}},
+                ]
+            }
+        )
+
+
+_default_repo: GovernmentOfficerRepository | None = None
+
+
+def _repo() -> GovernmentOfficerRepository:
+    global _default_repo
+    if _default_repo is None:
+        from database.mongo_client import db
+
+        _default_repo = GovernmentOfficerRepository(db)
+    return _default_repo
+
+
+def add_officer(officer_data: Dict[str, Any]):
+    return _repo().add_officer(officer_data)
+
+
+def create_officer_account(officer_data: Dict[str, Any]):
+    return _repo().create_officer_account(officer_data)
+
+
+def delete_officer(officer_id: object):
+    return _repo().delete_officer(officer_id)
+
+
+def update_officer(officer_id: object, update_data: Dict[str, Any]):
+    return _repo().update_officer(officer_id, update_data)
+
 
 def search_officer(query=None, department=None, district=None):
-    """
-    Searches officers with search query text and optional filters.
-    """
-    find_query = {}
-    
-    if query:
-        search_regex = {"$regex": str(query), "$options": "i"}
-        digit_values = _digit_query_values(query)
-        find_query["$or"] = [
-            {"name": search_regex},
-            {"officer_id": search_regex},
-            {"employee_id": search_regex},
-            {"designation": search_regex},
-            {"phone": search_regex},
-            {"phone_number": search_regex},
-            {"email": search_regex}
-        ]
-        if digit_values:
-            find_query["$or"].extend([
-                {"phone": {"$in": digit_values}},
-                {"phone_number": {"$in": digit_values}},
-                {"mobile": {"$in": digit_values}},
-            ])
-        
-    if department:
-        find_query["department"] = department
-        
-    if district:
-        find_query["district"] = district
-        
-    return list(officers_collection.find(find_query))
+    return _repo().search_officer(query=query, department=department, district=district)
+
 
 def get_all_officers():
-    """
-    Retrieves all government officers.
-    """
-    return list(officers_collection.find())
+    return _repo().get_all_officers()
 
 
-def get_officer_by_identifier(identifier):
-    """
-    Fetch an officer by email, mobile/phone, employee_id, or officer_id.
-    """
-    normalized = _normalize_identifier(identifier)
-    if not normalized:
-        return None
-
-    if "@" in normalized:
-        return officers_collection.find_one({"email": normalized})
-
-    digit_values = _digit_query_values(normalized)
-    return officers_collection.find_one(
-        {
-            "$or": [
-                {"employee_id": normalized},
-                {"officer_id": normalized},
-                {"phone": {"$in": digit_values}},
-                {"mobile": {"$in": digit_values}},
-                {"phone_number": {"$in": digit_values}},
-            ]
-        }
-    )
+def get_officer_by_identifier(identifier: object):
+    return _repo().get_officer_by_identifier(identifier)

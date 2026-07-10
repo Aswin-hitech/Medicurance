@@ -1,16 +1,19 @@
 from datetime import datetime, timedelta, timezone
+import hashlib
+import secrets
 
 import bcrypt
-from flask import Blueprint, request, render_template, redirect, session, flash, url_for
+from flask import Blueprint, request, render_template, redirect, session, flash, url_for, make_response, jsonify
 from services.otp_service import store_otp, verify_otp
 from database.user_repository import get_user_by_mobile, create_user, update_password
 from database.govt_repository import get_employee_by_mobile, verify_employee_identity, link_new_mobile
-from database.mongo_client import admins_collection, users_collection, officers_collection
+from database.mongo_client import admins_collection, users_collection, officers_collection, email_verifications_collection
 from config.settings import Config
 from services.auth_service import authenticate_admin, authenticate_officer, authenticate_user, fetch_user_role, needs_verification
 from utils.logger import log_audit, logger
 from utils.rate_limiter import limit_route
 from utils.password_policy import validate_password_policy
+from utils.jwt_utils import clear_auth_cookies, issue_auth_tokens, revoke_refresh_token, set_auth_cookies, get_token_from_request, decode_token, is_token_revoked
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -293,6 +296,38 @@ def _start_identity_verification(mobile, role="user"):
     flash("Please verify your government identity to continue.", "info")
     return redirect(url_for("auth.verify_identity_page"))
 
+
+def _queue_email_verification(email: str, mobile: str | None = None):
+    if not email:
+        return None
+    raw_token = secrets.token_urlsafe(32)
+    token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+    expires_at = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+    email_verifications_collection.update_one(
+        {"email": email.lower().strip()},
+        {"$set": {
+            "email": email.lower().strip(),
+            "mobile": mobile,
+            "token_hash": token_hash,
+            "expires_at": expires_at,
+            "verified": False,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }},
+        upsert=True,
+    )
+    logger.info("[AUTH] Email verification queued for %s", email)
+    return raw_token
+
+
+def _finalize_session_login(role: str, identifier: str, account: dict, redirect_endpoint: str):
+    session.permanent = True
+    session["authenticated"] = True
+    session["role"] = role
+    tokens = issue_auth_tokens(identifier, role, extra={"mobile": account.get("mobile", identifier), "user_id": account.get("employee_id") or account.get("officer_id") or identifier})
+    response = make_response(redirect(url_for(redirect_endpoint)))
+    set_auth_cookies(response, tokens)
+    return response
+
 @auth_bp.route("/")
 def login():
     _clear_identity_verification_state()
@@ -347,10 +382,9 @@ def verify_otp_route():
             session["mobile"] = account.get("email", mobile)
             session["user_id"] = account.get("email", mobile)
             session["role"] = "admin"
-            session["authenticated"] = True
             flash("Logged in successfully!", "success")
             logger.info("[AUTH] Admin login success | user_id=%s", session.get("user_id"))
-            return redirect(url_for('admin.dashboard'))
+            return _finalize_session_login("admin", account.get("email", mobile), account, "admin.dashboard")
 
         if role == "officer":
             if needs_verification(account):
@@ -362,7 +396,7 @@ def verify_otp_route():
             flash("Logged in successfully!", "success")
             logger.info("[AUTH] Officer login success | user_id=%s", session.get("user_id"))
             logger.info("[LOOP PREVENTION] Verification bypassed for verified officer | user_id=%s", session.get("user_id"))
-            return redirect(url_for('officer.dashboard'))
+            return _finalize_session_login("officer", mobile, account, "officer.dashboard")
 
         employee = account if account.get("is_government_employee") else get_employee_by_mobile(mobile)
         if employee or account.get("is_government_employee"):
@@ -370,10 +404,9 @@ def verify_otp_route():
             session["mobile"] = mobile
             session["user_id"] = employee.get("employee_id") if employee else mobile
             session["role"] = role
-            session["authenticated"] = True
             flash("Logged in successfully!", "success")
             logger.info("[AUTH] User login success | mobile=%s", mobile)
-            return redirect(url_for('user.dashboard'))
+            return _finalize_session_login("user", mobile, employee or account, "user.dashboard")
 
         return _start_identity_verification(mobile, role)
 
@@ -410,10 +443,16 @@ def register_submit():
         "date_of_birth": request.form.get("date_of_birth"),
         "department": request.form.get("department"),
         "designation": request.form.get("designation"),
+        "email": request.form.get("email"),
         "mobile": mobile,
     }
     is_verified, employee, message = verify_employee_identity(identity_data)
-    extra_fields = {"is_government_employee": False, "claim_eligibility": False}
+    extra_fields = {
+        "is_government_employee": False,
+        "claim_eligibility": False,
+        "email": request.form.get("email"),
+        "email_verified": False,
+    }
     if is_verified and employee:
         extra_fields.update(_verification_payload(employee))
         extra_fields["is_government_employee"] = True
@@ -423,11 +462,14 @@ def register_submit():
 
     hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
     create_user(mobile, hashed, extra_fields=extra_fields)
+    verification_token = _queue_email_verification(request.form.get("email"), mobile=mobile)
     log_audit(mobile, "register", "New user registered via password", {"government_verified": bool(is_verified)})
     if is_verified:
         flash("Registration successful. Please login.", "success")
     else:
         flash("Registration successful, but government verification is pending. Claims require identity verification.", "warning")
+    if verification_token:
+        logger.info("[AUTH] Email verification token generated for %s", request.form.get("email"))
     return redirect(url_for('auth.login'))
 
 @auth_bp.route("/login_user", methods=["POST"])
@@ -482,15 +524,14 @@ def login_submit():
         session["mobile"] = admin.get("email", identifier)
         session["user_id"] = admin.get("email", identifier)
         session["role"] = "admin"
-        session["authenticated"] = True
-        return redirect(url_for('admin.dashboard'))
+        return _finalize_session_login("admin", admin.get("email", identifier), admin, "admin.dashboard")
 
     if role == "officer":
         officer = auth_result.get("document") or {}
         if needs_verification(officer):
             return _start_identity_verification(identifier, "officer")
         _create_officer_session(officer, identifier)
-        return redirect(url_for('officer.dashboard'))
+        return _finalize_session_login("officer", identifier, officer, "officer.dashboard")
 
     user = auth_result.get("document") or {}
     employee = auth_result.get("employee") or (user if user.get("is_government_employee") else get_employee_by_mobile(identifier))
@@ -498,8 +539,7 @@ def login_submit():
         session["mobile"] = _normalize_mobile(identifier)
         session["user_id"] = employee.get("employee_id") if employee else _normalize_mobile(identifier)
         session["role"] = "user"
-        session["authenticated"] = True
-        return redirect(url_for('user.dashboard'))
+        return _finalize_session_login("user", identifier, employee or user, "user.dashboard")
 
     return _start_identity_verification(identifier, "user")
 
@@ -717,7 +757,60 @@ def verify_identity_submit():
 def logout():
     actor = session.get("user_id", session.get("mobile", "unknown"))
     log_audit(actor, "logout", "User logged out")
+    response = make_response(redirect(url_for('auth.login')))
     _clear_identity_verification_state()
     session.clear()
     flash("You have been logged out.", "success")
-    return redirect(url_for('auth.login'))
+    clear_auth_cookies(response)
+    return response
+
+
+@auth_bp.route("/verify_email/<token>")
+def verify_email(token):
+    token_hash = hashlib.sha256(str(token or "").encode("utf-8")).hexdigest()
+    record = email_verifications_collection.find_one({"token_hash": token_hash})
+    if not record:
+        flash("Email verification link is invalid or expired.", "danger")
+        return redirect(url_for("auth.login"))
+
+    if record.get("expires_at"):
+        try:
+            expires_at = datetime.fromisoformat(str(record["expires_at"]).replace("Z", "+00:00"))
+            if expires_at < datetime.now(timezone.utc):
+                flash("Email verification link has expired.", "danger")
+                return redirect(url_for("auth.login"))
+        except Exception:
+            pass
+
+    email = record.get("email")
+    mobile = record.get("mobile")
+    users_collection.update_one(
+        {"$or": [{"email": email}, {"mobile": mobile}]},
+        {"$set": {"email_verified": True, "updated_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    email_verifications_collection.delete_one({"token_hash": token_hash})
+    log_audit(email or mobile or "unknown", "email_verified", "Email address verified")
+    flash("Email verified successfully.", "success")
+    return redirect(url_for("auth.login"))
+
+
+@auth_bp.route("/token/refresh", methods=["POST"])
+def refresh_token_route():
+    token = get_token_from_request(cookie_name=Config.JWT_REFRESH_COOKIE_NAME)
+    if not token:
+        return {"error": "missing_refresh_token", "message": "Refresh token is required."}, 401
+    if is_token_revoked(token):
+        return {"error": "revoked_token", "message": "Refresh token has been revoked."}, 401
+    try:
+        payload = decode_token(token)
+    except Exception:
+        return {"error": "invalid_token", "message": "Refresh token is invalid or expired."}, 401
+    if payload.get("type") != "refresh":
+        return {"error": "invalid_token_type", "message": "Refresh token required."}, 401
+
+    role = str(payload.get("role") or "user")
+    identity = str(payload.get("sub") or "")
+    revoke_refresh_token(token, reason="rotation")
+    tokens = issue_auth_tokens(identity, role, extra={"mobile": payload.get("mobile"), "user_id": payload.get("user_id")})
+    flask_response = make_response(jsonify({"access_token": tokens["access_token"], "token_type": "bearer"}), 200)
+    return set_auth_cookies(flask_response, tokens)

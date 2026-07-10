@@ -1,0 +1,48 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Compile
+        run: python -m compileall app.py blueprints core database memory services utils tests
+
+      - name: Run tests
+        env:
+          MONGO_URI: mongodb://localhost:27017/medicurance_test
+          SECRET_KEY: ci-secret
+          JWT_SECRET_KEY: ci-jwt-secret
+          GROQ_API_KEY: test
+          GROQ_MODEL: test
+          OCR_SPACE_API_KEY: test
+          SUPABASE_URL: https://example.supabase.co
+          SUPABASE_SECRET_KEY: test
+          SUPABASE_API_KEY: test
+          MSG91_API_KEY: test
+          MSG91_TEMPLATE_ID: test
+          MSG91_SENDER_ID: test
+        run: python -m unittest -q tests.test_phase2_security

@@ -1,24 +1,25 @@
 {% extends "base.html" %}
 
-{% block title %}Admin Dashboard | MediCurance{% endblock %}
+{% block title %}Admin Command Center | MediCurance{% endblock %}
 
 {% block content %}
-<div class="card animate-in">
-    <div class="toolbar" style="margin-bottom:1rem;">
+<div class="hero-shell animate-in">
+    <div class="panel-hero">
         <div>
-            <div class="chip"><i class="fa-solid fa-shield-halved"></i> Admin command center</div>
-            <h1 style="margin-top:0.75rem;">All claims</h1>
-            <p class="muted">Search, filter, inspect, export, and monitor every reimbursement request.</p>
+            <span class="hero-topline"><i class="fa-solid fa-shield-halved"></i> Enterprise claims command center</span>
+            <h1>Operational view across users, claims, and hospitals</h1>
+            <p class="muted">Track throughput, review anomaly signals, and move quickly from insight to action.</p>
         </div>
         <div class="toolbar">
             <a href="{{ url_for('admin.system_health') }}" class="btn btn-secondary btn-sm"><i class="fa-solid fa-heart-pulse"></i> Health</a>
-            <a href="{{ url_for('admin.export_claims_csv', q=search, status=selected_status, hospital=selected_hospital, verification=selected_verification, sort=sort_by, order=sort_order) }}" class="btn btn-primary btn-sm"><i class="fa-solid fa-file-export"></i> CSV</a>
+            <a href="{{ url_for('admin.intelligence_dashboard') }}" class="btn btn-primary btn-sm"><i class="fa-solid fa-chart-network"></i> Intelligence</a>
+            <a href="{{ url_for('admin.export_claims_csv', q=search, status=selected_status, hospital=selected_hospital, verification=selected_verification, sort=sort_by, order=sort_order) }}" class="btn btn-secondary btn-sm"><i class="fa-solid fa-file-arrow-down"></i> Export CSV</a>
         </div>
     </div>
 
     <div class="stats-row">
-        <div class="stat-card"><div class="muted">Total users</div><div class="stat-value">{{ stats.total_users }}</div></div>
-        <div class="stat-card"><div class="muted">Total claims</div><div class="stat-value">{{ stats.total_claims }}</div></div>
+        <div class="stat-card"><div class="muted">Users</div><div class="stat-value">{{ stats.total_users }}</div></div>
+        <div class="stat-card"><div class="muted">Claims</div><div class="stat-value">{{ stats.total_claims }}</div></div>
         <div class="stat-card"><div class="muted">Hospitals</div><div class="stat-value">{{ stats.total_hospitals }}</div></div>
         <div class="stat-card"><div class="muted">Pending</div><div class="stat-value">{{ stats.pending_claims }}</div></div>
         <div class="stat-card"><div class="muted">Approved</div><div class="stat-value">{{ stats.approved_claims }}</div></div>
@@ -29,119 +30,191 @@
         <div class="stat-card"><div class="muted">Duplicate groups</div><div class="stat-value">{{ stats.duplicate_groups }}</div></div>
     </div>
 
-    <form method="GET" class="card" style="margin-top:1rem;">
-        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
-            <div class="form-group">
-                <label class="form-label">Search</label>
-                <input type="text" name="q" class="form-control" value="{{ search }}" placeholder="Claim ID, name, hospital">
+    <div class="section-grid" style="margin-top:1rem;">
+        <section class="hero-panel" style="background: var(--surface-strong);">
+            <div class="section-heading">
+                <div>
+                    <span class="section-kicker">Claim operations</span>
+                    <h2>Search, sort, and filter the live queue</h2>
+                </div>
             </div>
-            <div class="form-group">
-                <label class="form-label">Status</label>
-                <select name="status" class="form-control">
-                    <option value="">All</option>
-                    {% for item in ['Pending', 'Approved', 'Rejected', 'Escalated'] %}
-                    <option value="{{ item }}" {% if selected_status == item %}selected{% endif %}>{{ item }}</option>
+
+            <form method="GET" class="card glass-panel" style="margin-top:1rem;">
+                <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+                    <div class="form-group">
+                        <label class="form-label">Search</label>
+                        <input type="text" name="q" class="form-control" value="{{ search }}" placeholder="Claim ID, name, hospital">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Status</label>
+                        <select name="status" class="form-control">
+                            <option value="">All statuses</option>
+                            {% for item in ['Pending', 'Approved', 'Rejected', 'Escalated'] %}
+                            <option value="{{ item }}" {% if selected_status == item %}selected{% endif %}>{{ item }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Hospital</label>
+                        <input type="text" name="hospital" class="form-control" value="{{ selected_hospital }}" placeholder="Hospital name">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Verification</label>
+                        <select name="verification" class="form-control">
+                            <option value="">All</option>
+                            <option value="verified" {% if selected_verification == 'verified' %}selected{% endif %}>Verified</option>
+                            <option value="review" {% if selected_verification == 'review' %}selected{% endif %}>Needs review</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="toolbar" style="margin-top:0.85rem; justify-content:space-between; gap:0.75rem;">
+                    <div class="toolbar">
+                        <label class="muted">Sort</label>
+                        <select name="sort" class="form-control" style="width:auto;">
+                            <option value="created_at" {% if sort_by == 'created_at' %}selected{% endif %}>Created</option>
+                            <option value="amount" {% if sort_by == 'amount' %}selected{% endif %}>Amount</option>
+                            <option value="status" {% if sort_by == 'status' %}selected{% endif %}>Status</option>
+                            <option value="hospital" {% if sort_by == 'hospital' %}selected{% endif %}>Hospital</option>
+                        </select>
+                        <select name="order" class="form-control" style="width:auto;">
+                            <option value="desc" {% if sort_order == 'desc' %}selected{% endif %}>Newest</option>
+                            <option value="asc" {% if sort_order == 'asc' %}selected{% endif %}>Oldest</option>
+                        </select>
+                        <input type="hidden" name="page" value="1">
+                    </div>
+                    <div class="toolbar">
+                        <button type="submit" class="btn btn-primary btn-sm">Apply filters</button>
+                        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary btn-sm">Reset</a>
+                    </div>
+                </div>
+            </form>
+
+            <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-top:1rem;">
+                <div class="card">
+                    <div class="section-heading">
+                        <div>
+                            <span class="section-kicker">Fraud mix</span>
+                            <h3>Risk distribution</h3>
+                        </div>
+                    </div>
+                    <canvas id="fraudChart" height="220"></canvas>
+                </div>
+                <div class="card">
+                    <div class="section-heading">
+                        <div>
+                            <span class="section-kicker">Throughput</span>
+                            <h3>Monthly claims</h3>
+                        </div>
+                    </div>
+                    <canvas id="monthlyChart" height="220"></canvas>
+                </div>
+                <div class="card">
+                    <div class="section-heading">
+                        <div>
+                            <span class="section-kicker">Hospitals</span>
+                            <h3>Usage profile</h3>
+                        </div>
+                    </div>
+                    <canvas id="hospitalChart" height="220"></canvas>
+                </div>
+                <div class="card">
+                    <div class="section-heading">
+                        <div>
+                            <span class="section-kicker">Departments</span>
+                            <h3>Claim concentration</h3>
+                        </div>
+                    </div>
+                    <canvas id="deptChart" height="220"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <aside class="hero-panel" style="background: var(--surface-strong);">
+            <div class="section-heading">
+                <div>
+                    <span class="section-kicker">Operational signals</span>
+                    <h2>Platform snapshot</h2>
+                </div>
+            </div>
+
+            <div class="insight-grid" style="margin-top:1rem;">
+                <div class="insight-card">
+                    <h3>{{ stats.govt_employees }}</h3>
+                    <p>Government employees linked to the platform.</p>
+                </div>
+                <div class="insight-card">
+                    <h3>{{ stats.officers }}</h3>
+                    <p>Officer accounts available for review load balancing.</p>
+                </div>
+                <div class="insight-card">
+                    <h3>{{ stats.fraud_levels.HIGH if stats.fraud_levels else 0 }}</h3>
+                    <p>High-risk claims routed for closer inspection.</p>
+                </div>
+                <div class="insight-card">
+                    <h3>{{ total_claims }}</h3>
+                    <p>Total claims in the current working set.</p>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top:1rem;">
+                <h3>Action notes</h3>
+                <p class="muted">Use this dashboard to spot anomalies, rebalance workloads, and export filtered slices for audit or reporting.</p>
+            </div>
+
+            {% if total_pages and total_pages > 1 %}
+            <div class="toolbar" style="margin-top:1rem; justify-content:center;">
+                <a class="btn btn-secondary btn-sm {% if page == 1 %}disabled{% endif %}" href="{{ url_for('admin.dashboard', page=page-1, limit=limit, q=search, status=selected_status, hospital=selected_hospital, verification=selected_verification, sort=sort_by, order=sort_order) }}">Prev</a>
+                <span class="chip">Page {{ page }} of {{ total_pages }}</span>
+                <a class="btn btn-secondary btn-sm {% if page == total_pages %}disabled{% endif %}" href="{{ url_for('admin.dashboard', page=page+1, limit=limit, q=search, status=selected_status, hospital=selected_hospital, verification=selected_verification, sort=sort_by, order=sort_order) }}">Next</a>
+            </div>
+            {% endif %}
+        </aside>
+    </div>
+
+    <div class="card" style="margin-top:1rem;">
+        <div class="section-heading">
+            <div>
+                <span class="section-kicker">Queue review</span>
+                <h2>Recent claims and AI context</h2>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Claim</th>
+                        <th>Claimant</th>
+                        <th>Hospital</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>OCR</th>
+                        <th>Trust</th>
+                        <th>Fraud</th>
+                        <th>Duplicate</th>
+                        <th>Verification</th>
+                        <th>Summary</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for claim in claims %}
+                    <tr>
+                        <td><a href="{{ url_for('admin.claim_detail', claim_id=claim.claim_id) }}"><strong>#{{ claim.claim_id[-8:] }}</strong></a></td>
+                        <td>{{ claim.name }}</td>
+                        <td>{{ claim.hospital }}</td>
+                        <td>Rs. {{ "{:,.2f}".format(claim.amount) }}</td>
+                        <td><span class="badge badge-{{ claim.status.lower() }}">{{ claim.status }}</span></td>
+                        <td>{{ claim.ocr_confidence }}%</td>
+                        <td>{{ claim.trust_score }}%</td>
+                        <td>{{ claim.fraud_level }}</td>
+                        <td>{{ claim.duplicate_probability }}%</td>
+                        <td>{{ claim.verification_state }}</td>
+                        <td style="max-width:260px;">{{ claim.ai_reasoning_summary }}</td>
+                    </tr>
                     {% endfor %}
-                </select>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Hospital</label>
-                <input type="text" name="hospital" class="form-control" value="{{ selected_hospital }}" placeholder="Hospital name">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Verification</label>
-                <select name="verification" class="form-control">
-                    <option value="">All</option>
-                    <option value="verified" {% if selected_verification == 'verified' %}selected{% endif %}>Verified</option>
-                    <option value="review" {% if selected_verification == 'review' %}selected{% endif %}>Needs review</option>
-                </select>
-            </div>
-        </div>
-        <div class="toolbar" style="margin-top:0.75rem;">
-            <div class="toolbar">
-                <label class="muted">Sort by</label>
-                <select name="sort" class="form-control" style="width:auto;">
-                    <option value="created_at" {% if sort_by == 'created_at' %}selected{% endif %}>Created</option>
-                    <option value="amount" {% if sort_by == 'amount' %}selected{% endif %}>Amount</option>
-                    <option value="status" {% if sort_by == 'status' %}selected{% endif %}>Status</option>
-                    <option value="hospital" {% if sort_by == 'hospital' %}selected{% endif %}>Hospital</option>
-                </select>
-                <select name="order" class="form-control" style="width:auto;">
-                    <option value="desc" {% if sort_order == 'desc' %}selected{% endif %}>Newest</option>
-                    <option value="asc" {% if sort_order == 'asc' %}selected{% endif %}>Oldest</option>
-                </select>
-                <input type="hidden" name="page" value="1">
-            </div>
-            <div class="toolbar">
-                <button type="submit" class="btn btn-primary btn-sm">Apply</button>
-                <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary btn-sm">Reset</a>
-            </div>
-        </div>
-    </form>
-
-    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-top:1rem;">
-        <div class="card">
-            <h3>Fraud distribution</h3>
-            <canvas id="fraudChart" height="220"></canvas>
-        </div>
-        <div class="card">
-            <h3>Monthly claims</h3>
-            <canvas id="monthlyChart" height="220"></canvas>
-        </div>
-        <div class="card">
-            <h3>Hospital usage</h3>
-            <canvas id="hospitalChart" height="220"></canvas>
-        </div>
-        <div class="card">
-            <h3>Department claims</h3>
-            <canvas id="deptChart" height="220"></canvas>
+                </tbody>
+            </table>
         </div>
     </div>
-
-    <div class="table-wrap" style="margin-top:1rem;">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Claim</th>
-                    <th>Claimant</th>
-                    <th>Hospital</th>
-                    <th>Amount</th>
-                    <th>Status</th>
-                    <th>OCR</th>
-                    <th>Trust</th>
-                    <th>Fraud</th>
-                    <th>Duplicate</th>
-                    <th>Verification</th>
-                    <th>Summary</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for claim in claims %}
-                <tr>
-                    <td><a href="{{ url_for('admin.claim_detail', claim_id=claim.claim_id) }}"><strong>#{{ claim.claim_id[-8:] }}</strong></a></td>
-                    <td>{{ claim.name }}</td>
-                    <td>{{ claim.hospital }}</td>
-                    <td>Rs. {{ "{:,.2f}".format(claim.amount) }}</td>
-                    <td><span class="badge badge-{{ claim.status.lower() }}">{{ claim.status }}</span></td>
-                    <td>{{ claim.ocr_confidence }}%</td>
-                    <td>{{ claim.trust_score }}%</td>
-                    <td>{{ claim.fraud_level }}</td>
-                    <td>{{ claim.duplicate_probability }}%</td>
-                    <td>{{ claim.verification_state }}</td>
-                    <td style="max-width:260px;">{{ claim.ai_reasoning_summary }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-
-    {% if total_pages and total_pages > 1 %}
-    <div class="toolbar" style="margin-top:1rem; justify-content:center;">
-        <a class="btn btn-secondary btn-sm {% if page == 1 %}disabled{% endif %}" href="{{ url_for('admin.dashboard', page=page-1, limit=limit, q=search, status=selected_status, hospital=selected_hospital, verification=selected_verification, sort=sort_by, order=sort_order) }}">Prev</a>
-        <span class="chip">Page {{ page }} of {{ total_pages }}</span>
-        <a class="btn btn-secondary btn-sm {% if page == total_pages %}disabled{% endif %}" href="{{ url_for('admin.dashboard', page=page+1, limit=limit, q=search, status=selected_status, hospital=selected_hospital, verification=selected_verification, sort=sort_by, order=sort_order) }}">Next</a>
-    </div>
-    {% endif %}
 </div>
 {% endblock %}
 
@@ -153,9 +226,9 @@
     const hospitalCtx = document.getElementById("hospitalChart");
     const deptCtx = document.getElementById("deptChart");
 
-    if (fraudCtx) new Chart(fraudCtx, {type:"doughnut", data:{labels: {{ fraud_data.labels|tojson }}, datasets:[{data: {{ fraud_data.values|tojson }}, backgroundColor:["#16a34a","#d97706","#dc2626"]}]}, options:{responsive:true, plugins:{legend:{position:"bottom"}}}});
-    if (monthlyCtx) new Chart(monthlyCtx, {type:"line", data:{labels: {{ monthly_data.labels|tojson }}, datasets:[{data: {{ monthly_data.values|tojson }}, borderColor:"#2563eb", backgroundColor:"rgba(37,99,235,0.12)", fill:true, tension:0.3}]}, options:{responsive:true, plugins:{legend:{display:false}}}});
-    if (hospitalCtx) new Chart(hospitalCtx, {type:"bar", data:{labels: {{ hospital_data.labels|tojson }}, datasets:[{data: {{ hospital_data.values|tojson }}, backgroundColor:"#7c3aed"}]}, options:{responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}});
+    if (fraudCtx) new Chart(fraudCtx, {type:"doughnut", data:{labels: {{ fraud_data.labels|tojson }}, datasets:[{data: {{ fraud_data.values|tojson }}, backgroundColor:["#10b981","#f59e0b","#ef4444"]}]}, options:{responsive:true, plugins:{legend:{position:"bottom"}}}});
+    if (monthlyCtx) new Chart(monthlyCtx, {type:"line", data:{labels: {{ monthly_data.labels|tojson }}, datasets:[{data: {{ monthly_data.values|tojson }}, borderColor:"#2563eb", backgroundColor:"rgba(37,99,235,0.14)", fill:true, tension:0.3}]}, options:{responsive:true, plugins:{legend:{display:false}}}});
+    if (hospitalCtx) new Chart(hospitalCtx, {type:"bar", data:{labels: {{ hospital_data.labels|tojson }}, datasets:[{data: {{ hospital_data.values|tojson }}, backgroundColor:"#8b5cf6"}]}, options:{responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}});
     if (deptCtx) new Chart(deptCtx, {type:"bar", data:{labels: {{ dept_data.labels|tojson }}, datasets:[{data: {{ dept_data.values|tojson }}, backgroundColor:"#0f766e"}]}, options:{responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}}}});
 </script>
 {% endblock %}

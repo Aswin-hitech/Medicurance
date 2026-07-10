@@ -1,149 +1,140 @@
 {% extends "base.html" %}
 
-{% block title %}Login - MediCurance{% endblock %}
+{% block title %}Login | MediCurance{% endblock %}
 
 {% block content %}
-<div class="card" style="max-width: 450px; margin: 3rem auto;">
-    <div class="card-header" style="text-align: center;">
-        <h2><i class="fas fa-sign-in-alt"></i> Login</h2>
-        <p class="text-muted">Access your health claim account</p>
-    </div>
+<div class="hero-shell animate-in">
+    <div class="hero-grid">
+        <section class="hero-panel">
+            <span class="hero-topline"><i class="fa-solid fa-shield-heart"></i> Secure access</span>
+            <h1 style="margin-top:1rem;">Sign in to the enterprise claims platform</h1>
+            <p class="muted" style="max-width: 56ch;">Access beneficiary services, officer review workspaces, and admin intelligence dashboards from one trusted portal.</p>
 
-    <!-- Role Selection Dropdown -->
-    <div class="form-group" style="margin-bottom: 1.5rem;">
-        <label class="form-label" style="font-weight: 700; color: var(--primary-color);">
-            <i class="fas fa-user-tag"></i> Login As
-        </label>
-        <select id="loginRole" class="form-control" style="font-weight: 600;" onchange="handleRoleChange()">
-            <option value="user">Beneficiary (User)</option>
-            <option value="officer">Government Officer</option>
-            <option value="admin">System Administrator (Admin)</option>
-        </select>
-    </div>
+            <div class="insight-grid" style="margin-top:1.25rem;">
+                <div class="insight-card">
+                    <div class="muted">Security</div>
+                    <h3>Session + JWT</h3>
+                    <p class="muted">Short-lived access paired with refresh rotation.</p>
+                </div>
+                <div class="insight-card">
+                    <div class="muted">Experience</div>
+                    <h3>Fast onboarding</h3>
+                    <p class="muted">Choose password or OTP, depending on your role.</p>
+                </div>
+                <div class="insight-card">
+                    <div class="muted">Trust</div>
+                    <h3>Audit ready</h3>
+                    <p class="muted">Every action is logged for review and traceability.</p>
+                </div>
+            </div>
+        </section>
 
-    <ul class="nav nav-pills nav-justified mb-4" id="loginTabs" role="tablist" style="display: flex; list-style: none; padding: 0; margin-bottom: 1.5rem; gap: 1rem;">
-        <li class="nav-item" style="flex: 1;" id="tabPasswordLi">
-            <button type="button" id="tabPasswordBtn" class="btn btn-primary" style="width: 100%;" onclick="toggleLogin('password')">Password Login</button>
-        </li>
-        <li class="nav-item" style="flex: 1;" id="tabOtpLi">
-            <button type="button" id="tabOtpBtn" class="btn btn-secondary" style="width: 100%;" onclick="toggleLogin('otp')">OTP Login</button>
-        </li>
-    </ul>
+        <section class="hero-panel" style="background: var(--surface-strong);">
+            <div class="card-header">
+                <div class="chip"><i class="fa-solid fa-right-to-bracket"></i> Login</div>
+                <h2 style="margin-top:0.75rem;">Welcome back</h2>
+                <p class="muted">Use your role-specific sign-in method.</p>
+            </div>
 
-    <div id="passwordLoginSection">
-        <form action="{{ url_for('auth.login_submit') }}" method="POST" id="passwordLoginForm">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <!-- Role hidden input to tell backend the targeted role -->
-            <input type="hidden" name="role" id="formRole" value="user">
-            
-            <!-- Dynamic Identifier Input (Mobile/Email) -->
-            <div class="form-group" id="identifierGroup">
-                <label class="form-label" id="identifierLabel"><i class="fas fa-user"></i> Mobile Number or Email</label>
-                <input type="text" name="mobile" id="identifierInput" class="form-control" placeholder="Enter your Mobile Number or Email" required>
+            <div class="segmented" style="margin-bottom:1rem;">
+                <button type="button" id="tabPasswordBtn" class="btn btn-primary btn-sm" onclick="toggleLogin('password')">Password</button>
+                <button type="button" id="tabOtpBtn" class="btn btn-secondary btn-sm" onclick="toggleLogin('otp')">OTP</button>
             </div>
 
             <div class="form-group">
-                <label class="form-label"><i class="fas fa-lock"></i> Password</label>
-                <input type="password" name="password" class="form-control" placeholder="Enter your password" required>
+                <label class="form-label"><i class="fa-solid fa-user-tag"></i> Login as</label>
+                <select id="loginRole" class="form-control" onchange="handleRoleChange()">
+                    <option value="user">Beneficiary</option>
+                    <option value="officer">Government Officer</option>
+                    <option value="admin">System Administrator</option>
+                </select>
             </div>
 
-            <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.8rem;" id="passwordSubmitBtn">
-                Login with Password
-            </button>
-        </form>
-    </div>
-
-    <div id="otpLoginSection" style="display: none;">
-        <form action="{{ url_for('auth.send_otp_route') }}" method="POST" id="otpLoginForm">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="form-group">
-                <label class="form-label"><i class="fas fa-mobile-alt"></i> Mobile Number</label>
-                <input type="text" name="mobile" class="form-control" placeholder="Enter your 10-digit mobile" required pattern="[0-9]{10}" maxlength="10">
+            <div id="passwordLoginSection">
+                <form action="{{ url_for('auth.login_submit') }}" method="POST" id="passwordLoginForm">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="role" id="formRole" value="user">
+                    <div class="form-group" id="identifierGroup">
+                        <label class="form-label" id="identifierLabel">Mobile Number or Email</label>
+                        <input type="text" name="mobile" id="identifierInput" class="form-control" placeholder="Enter your mobile number or email" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input type="password" name="password" class="form-control" placeholder="Enter your password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100" id="passwordSubmitBtn">Login with password</button>
+                </form>
             </div>
 
-            <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.8rem;">
-                Send OTP
-            </button>
-        </form>
-    </div>
+            <div id="otpLoginSection" style="display:none;">
+                <form action="{{ url_for('auth.send_otp_route') }}" method="POST" id="otpLoginForm">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="form-group">
+                        <label class="form-label">Mobile Number</label>
+                        <input type="text" name="mobile" class="form-control" placeholder="10-digit mobile number" required pattern="[0-9]{10}" maxlength="10">
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Send OTP</button>
+                </form>
+            </div>
 
-    <script>
-        function toggleLogin(type) {
-            const pwdSec = document.getElementById('passwordLoginSection');
-            const otpSec = document.getElementById('otpLoginSection');
-            const pwdBtn = document.getElementById('tabPasswordBtn');
-            const otpBtn = document.getElementById('tabOtpBtn');
-
-            if (type === 'password') {
-                pwdSec.style.display = 'block';
-                otpSec.style.display = 'none';
-                pwdBtn.className = 'btn btn-primary';
-                otpBtn.className = 'btn btn-secondary';
-            } else {
-                pwdSec.style.display = 'none';
-                otpSec.style.display = 'block';
-                pwdBtn.className = 'btn btn-secondary';
-                otpBtn.className = 'btn btn-primary';
-            }
-        }
-
-        function handleRoleChange() {
-            const role = document.getElementById('loginRole').value;
-            const formRole = document.getElementById('formRole');
-            const tabOtpLi = document.getElementById('tabOtpLi');
-            const identifierGroup = document.getElementById('identifierGroup');
-            const identifierLabel = document.getElementById('identifierLabel');
-            const identifierInput = document.getElementById('identifierInput');
-            const passwordSubmitBtn = document.getElementById('passwordSubmitBtn');
-            
-            formRole.value = role;
-
-            if (role === 'admin') {
-                // Admin MUST use Email + Password. Hide OTP Login tab and force Password Login.
-                tabOtpLi.style.display = 'none';
-                toggleLogin('password');
-
-                // Swap inputs to Email
-                identifierLabel.innerHTML = '<i class="fas fa-envelope"></i> Admin Email Address';
-                identifierInput.type = 'email';
-                identifierInput.name = 'email';
-                identifierInput.placeholder = 'admin@medicurance.gov.in';
-                identifierInput.value = '';
-                identifierInput.removeAttribute('pattern');
-                identifierInput.removeAttribute('maxlength');
-                passwordSubmitBtn.innerText = 'Login as Admin';
-            } else {
-                // Restore tabs and mobile inputs for user/officer
-                tabOtpLi.style.display = 'block';
-                
-                // Swap inputs back to Mobile/Email
-                identifierLabel.innerHTML = '<i class="fas fa-user"></i> Mobile Number or Email';
-                identifierInput.type = 'text';
-                identifierInput.name = 'mobile';
-                identifierInput.placeholder = 'Enter your Mobile Number or Email';
-                identifierInput.value = '';
-                identifierInput.removeAttribute('pattern');
-                identifierInput.removeAttribute('maxlength');
-                
-                if (role === 'officer') {
-                    passwordSubmitBtn.innerText = 'Login as Officer';
-                } else {
-                    passwordSubmitBtn.innerText = 'Login with Password';
-                }
-            }
-        }
-    </script>
-
-    <div style="margin-top: 1.5rem; text-align: center; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
-        <a href="{{ url_for('auth.forgot_password') }}" class="text-muted" style="text-decoration: none;">
-            <i class="fas fa-key"></i> Forgot Password?
-        </a>
-        <div style="margin-top: 1.5rem;" id="registrationContainer">
-            <p class="text-muted">Don't have an account?</p>
-            <a href="{{ url_for('auth.register_page') }}" class="btn btn-secondary" style="margin-top: 0.5rem; width: 100%;">
-                <i class="fas fa-user-plus"></i> Register Policy
-            </a>
-        </div>
+            <div class="card" style="margin-top:1rem; margin-bottom:0; background: var(--bg-elevated);">
+                <div class="toolbar">
+                    <a href="{{ url_for('auth.forgot_password') }}" class="muted"><i class="fa-solid fa-key"></i> Forgot password?</a>
+                    <a href="{{ url_for('auth.register_page') }}" class="muted"><i class="fa-solid fa-user-plus"></i> New account</a>
+                </div>
+            </div>
+        </section>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function toggleLogin(type) {
+        const pwdSec = document.getElementById('passwordLoginSection');
+        const otpSec = document.getElementById('otpLoginSection');
+        const pwdBtn = document.getElementById('tabPasswordBtn');
+        const otpBtn = document.getElementById('tabOtpBtn');
+
+        if (type === 'password') {
+            pwdSec.style.display = 'block';
+            otpSec.style.display = 'none';
+            pwdBtn.className = 'btn btn-primary btn-sm';
+            otpBtn.className = 'btn btn-secondary btn-sm';
+        } else {
+            pwdSec.style.display = 'none';
+            otpSec.style.display = 'block';
+            pwdBtn.className = 'btn btn-secondary btn-sm';
+            otpBtn.className = 'btn btn-primary btn-sm';
+        }
+    }
+
+    function handleRoleChange() {
+        const role = document.getElementById('loginRole').value;
+        const formRole = document.getElementById('formRole');
+        const tabOtpBtn = document.getElementById('tabOtpBtn');
+        const identifierLabel = document.getElementById('identifierLabel');
+        const identifierInput = document.getElementById('identifierInput');
+        const passwordSubmitBtn = document.getElementById('passwordSubmitBtn');
+
+        formRole.value = role;
+
+        if (role === 'admin') {
+            tabOtpBtn.style.display = 'none';
+            toggleLogin('password');
+            identifierLabel.textContent = 'Admin Email Address';
+            identifierInput.type = 'email';
+            identifierInput.name = 'email';
+            identifierInput.placeholder = 'admin@medicurance.gov.in';
+            passwordSubmitBtn.textContent = 'Login as admin';
+        } else {
+            tabOtpBtn.style.display = 'inline-flex';
+            identifierLabel.textContent = 'Mobile Number or Email';
+            identifierInput.type = 'text';
+            identifierInput.name = 'mobile';
+            identifierInput.placeholder = 'Enter your mobile number or email';
+            passwordSubmitBtn.textContent = role === 'officer' ? 'Login as officer' : 'Login with password';
+        }
+    }
+</script>
 {% endblock %}

@@ -3,32 +3,63 @@
 {% block title %}Dashboard | MediCurance{% endblock %}
 
 {% block content %}
-<div class="card animate-in">
-    <div class="card-header">
-        <div class="chip"><i class="fa-solid fa-house"></i> Beneficiary home</div>
-        <h1 style="margin-top:0.75rem;">Welcome back</h1>
-        <p class="muted">Manage claims, documents, and your account from one place.</p>
-    </div>
+<div class="hero-shell animate-in">
+    <div class="hero-grid">
+        <section class="hero-panel">
+            <span class="hero-topline"><i class="fa-solid fa-house"></i> Beneficiary home</span>
+            <h1 style="margin-top:1rem;">Claims at a glance</h1>
+            <p class="muted" style="max-width: 58ch;">Manage submissions, view status updates, and follow your reimbursement journey from one dashboard.</p>
 
-    <div class="dashboard-grid">
-        <div class="card" style="margin-bottom:0;">
-            <i class="fa-solid fa-file-circle-plus" style="font-size:2rem; color: var(--primary);"></i>
-            <h3 style="margin-top:1rem;">New claim</h3>
-            <p class="muted">Submit a reimbursement request.</p>
-            <a href="{{ url_for('user.claim_request') }}" class="btn btn-primary w-100">Start</a>
-        </div>
-        <div class="card" style="margin-bottom:0;">
-            <i class="fa-solid fa-layer-group" style="font-size:2rem; color: var(--primary);"></i>
-            <h3 style="margin-top:1rem;">Track claims</h3>
-            <p class="muted">Review status and letters.</p>
-            <a href="{{ url_for('user.claim_status') }}" class="btn btn-primary w-100">Open</a>
-        </div>
-        <div class="card" style="margin-bottom:0;">
-            <i class="fa-solid fa-user" style="font-size:2rem; color: var(--primary);"></i>
-            <h3 style="margin-top:1rem;">Profile</h3>
-            <p class="muted">Check your government record.</p>
-            <a href="{{ url_for('user.profile') }}" class="btn btn-secondary w-100">View</a>
-        </div>
+            <div class="stats-row" style="margin-top:1.25rem;">
+                <div class="stat-card"><div class="muted">Pending</div><div class="stat-value">01</div></div>
+                <div class="stat-card"><div class="muted">Approved</div><div class="stat-value">05</div></div>
+                <div class="stat-card"><div class="muted">Actions</div><div class="stat-value">02</div></div>
+            </div>
+
+            <div class="timeline" style="margin-top:1.25rem;">
+                <div class="timeline-item done">
+                    <div class="timeline-icon"><i class="fa-solid fa-file-circle-plus"></i></div>
+                    <div><strong>Upload claim</strong><p class="muted">Submit a bill with supporting information.</p></div>
+                </div>
+                <div class="timeline-item active">
+                    <div class="timeline-icon"><i class="fa-solid fa-brain"></i></div>
+                    <div><strong>AI processing</strong><p class="muted">OCR, RAG, fraud, duplicate, and trust checks run in sequence.</p></div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-icon"><i class="fa-solid fa-user-shield"></i></div>
+                    <div><strong>Officer review</strong><p class="muted">Your claim is finalized by a human reviewer when needed.</p></div>
+                </div>
+            </div>
+        </section>
+
+        <aside class="hero-panel" style="background: var(--surface-strong);">
+            <div class="card-header">
+                <div class="chip"><i class="fa-solid fa-square-kanban"></i> Quick actions</div>
+                <h2 style="margin-top:0.75rem;">Start here</h2>
+            </div>
+            <div class="dashboard-grid">
+                <div class="insight-card">
+                    <h3>New claim</h3>
+                    <p class="muted">Submit a reimbursement request with document upload.</p>
+                    <a href="{{ url_for('user.claim_request') }}" class="btn btn-primary w-100">Submit claim</a>
+                </div>
+                <div class="insight-card">
+                    <h3>Claim history</h3>
+                    <p class="muted">Review current and past submissions.</p>
+                    <a href="{{ url_for('user.claim_status') }}" class="btn btn-secondary w-100">Open timeline</a>
+                </div>
+                <div class="insight-card">
+                    <h3>Profile</h3>
+                    <p class="muted">Check your account and government record.</p>
+                    <a href="{{ url_for('user.profile') }}" class="btn btn-secondary w-100">View profile</a>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top:1rem; margin-bottom:0; background: var(--bg-elevated);">
+                <h3>Notifications</h3>
+                <p class="muted">Real-time updates, document requests, and decision notices appear here.</p>
+            </div>
+        </aside>
     </div>
 </div>
 {% endblock %}

@@ -1,145 +1,134 @@
 {% extends "base.html" %}
 
-{% block title %}AI Governance Dashboard | MediCurance{% endblock %}
+{% block title %}AI Intelligence | MediCurance{% endblock %}
 
 {% block content %}
-<!-- Sleek Admin Sub-Navbar -->
-<div class="card" style="padding: 1rem 1.5rem; margin-bottom: 2rem; background: var(--primary-color); border: none; border-radius: var(--border-radius);">
-    <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; justify-content: start;">
-        <span style="color: white; font-weight: 700; margin-right: 0.5rem;"><i class="fas fa-toolbox"></i> ADMIN CONTROL:</span>
-        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline btn-sm"><i class="fas fa-hospital"></i> Hospital Mgmt</a>
-        <a href="{{ url_for('admin.intelligence_dashboard') }}" class="btn btn-outline btn-sm" style="background: rgba(255,255,255,0.2);"><i class="fas fa-brain"></i> AI Governance</a>
-        <a href="{{ url_for('admin.trust_analysis_dashboard') }}" class="btn btn-outline btn-sm"><i class="fas fa-shield-virus"></i> Claim Trust AI</a>
-        <a href="{{ url_for('admin.govt_database') }}" class="btn btn-outline btn-sm"><i class="fas fa-users-cog"></i> Govt Employees</a>
-        <a href="{{ url_for('admin.manage_officers') }}" class="btn btn-outline btn-sm"><i class="fas fa-user-tie"></i> Manage Officers</a>
-        <a href="{{ url_for('admin.database_explorer') }}" class="btn btn-outline btn-sm"><i class="fas fa-database"></i> DB Explorer</a>
-    </div>
-</div>
-
-<div class="card-header">
-    <h1><i class="fas fa-brain"></i> AI Governance & Intelligence Panel</h1>
-    <p class="text-muted">Real-time predictive analytics, claim trends, and anomaly detection</p>
-</div>
-
-<!-- Grid of Analytics Counters -->
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1.25rem; margin-top: 1.5rem; margin-bottom: 2rem;">
-    <!-- Claims Summary -->
-    <div class="card" style="margin: 0; padding: 1.25rem; border-left: 4px solid var(--primary-color);">
-        <span class="text-muted" style="font-size: 0.85rem; font-weight: 600;">TOTAL CLAIMS</span>
-        <h2 style="font-size: 2rem; margin-top: 0.25rem;">{{ stats.total_claims }}</h2>
-    </div>
-    <div class="card" style="margin: 0; padding: 1.25rem; border-left: 4px solid var(--warning-color);">
-        <span style="color: var(--warning-color); font-size: 0.85rem; font-weight: 600;">PENDING CLAIMS</span>
-        <h2 style="font-size: 2rem; margin-top: 0.25rem; color: var(--warning-color);">{{ stats.pending_claims }}</h2>
-    </div>
-    <div class="card" style="margin: 0; padding: 1.25rem; border-left: 4px solid var(--success-color);">
-        <span style="color: var(--success-color); font-size: 0.85rem; font-weight: 600;">APPROVED CLAIMS</span>
-        <h2 style="font-size: 2rem; margin-top: 0.25rem; color: var(--success-color);">{{ stats.approved_claims }}</h2>
-    </div>
-    <div class="card" style="margin: 0; padding: 1.25rem; border-left: 4px solid var(--danger-color);">
-        <span style="color: var(--danger-color); font-size: 0.85rem; font-weight: 600;">REJECTED CLAIMS</span>
-        <h2 style="font-size: 2rem; margin-top: 0.25rem; color: var(--danger-color);">{{ stats.rejected_claims }}</h2>
-    </div>
-
-    <!-- AI Specific Stats -->
-    <div class="card" style="margin: 0; padding: 1.25rem; border-left: 4px solid #a6a6a6; background: #fffcf5;">
-        <span style="color: #665c33; font-size: 0.85rem; font-weight: 600;"><i class="fas fa-flag"></i> FRAUD FLAGGED</span>
-        <h2 style="font-size: 2rem; margin-top: 0.25rem; color: #856404;">{{ stats.fraud_flagged }}</h2>
-    </div>
-    <div class="card" style="margin: 0; padding: 1.25rem; border-left: 4px solid var(--danger-color); background: #fff5f5;">
-        <span style="color: var(--danger-color); font-size: 0.85rem; font-weight: 600;"><i class="fas fa-skull-crossbones"></i> HIGH RISK CLAIMS</span>
-        <h2 style="font-size: 2rem; margin-top: 0.25rem; color: var(--danger-color);">{{ stats.high_risk }}</h2>
-    </div>
-
-    <!-- Directory counts -->
-    <div class="card" style="margin: 0; padding: 1.25rem; border-left: 4px solid var(--primary-color);">
-        <span class="text-muted" style="font-size: 0.85rem; font-weight: 600;">GOVT EMPLOYEES</span>
-        <h2 style="font-size: 2rem; margin-top: 0.25rem;">{{ stats.govt_employees_count }}</h2>
-    </div>
-    <div class="card" style="margin: 0; padding: 1.25rem; border-left: 4px solid var(--success-color);">
-        <span style="color: var(--success-color); font-size: 0.85rem; font-weight: 600;">VERIFIED BENEFICIARIES</span>
-        <h2 style="font-size: 2rem; margin-top: 0.25rem; color: var(--success-color);">{{ stats.verified_employees_count }}</h2>
-    </div>
-    <div class="card" style="margin: 0; padding: 1.25rem; border-left: 4px solid var(--primary-color);">
-        <span class="text-muted" style="font-size: 0.85rem; font-weight: 600;">HOSPITALS</span>
-        <h2 style="font-size: 2rem; margin-top: 0.25rem;">{{ stats.hospitals_count }}</h2>
-    </div>
-    <div class="card" style="margin: 0; padding: 1.25rem; border-left: 4px solid var(--primary-color);">
-        <span class="text-muted" style="font-size: 0.85rem; font-weight: 600;">GOVT OFFICERS</span>
-        <h2 style="font-size: 2rem; margin-top: 0.25rem;">{{ stats.officers_count }}</h2>
-    </div>
-</div>
-
-<!-- Row 1: Trends & Approvals -->
-<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; margin-bottom: 2rem; flex-wrap: wrap;">
-    <div class="card" style="margin: 0; padding: 1.5rem;">
-        <h3><i class="fas fa-chart-line"></i> Monthly Claim Volume Trends</h3>
-        <div style="height: 300px; margin-top: 1rem;">
-            <canvas id="monthlyTrendsChart"></canvas>
+<div class="hero-shell animate-in">
+    <div class="panel-hero">
+        <div>
+            <span class="hero-topline"><i class="fa-solid fa-brain"></i> AI governance and intelligence</span>
+            <h1>Claim trends, risk signals, and reviewer activity in one place</h1>
+            <p class="muted">This workspace blends operational metrics with decision-support charts so the admin team can steer the platform with confidence.</p>
+        </div>
+        <div class="toolbar">
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary btn-sm"><i class="fa-solid fa-table"></i> Claims</a>
+            <a href="{{ url_for('admin.trust_analysis_dashboard') }}" class="btn btn-primary btn-sm"><i class="fa-solid fa-shield-virus"></i> Trust analysis</a>
+            <a href="{{ url_for('admin.database_explorer') }}" class="btn btn-secondary btn-sm"><i class="fa-solid fa-database"></i> Explorer</a>
         </div>
     </div>
-    <div class="card" style="margin: 0; padding: 1.5rem;">
-        <h3><i class="fas fa-chart-pie"></i> Claim Resolution Ratio</h3>
-        <div style="height: 300px; margin-top: 1rem;">
-            <canvas id="approvalRatioChart"></canvas>
-        </div>
+
+    <div class="stats-row">
+        <div class="stat-card"><div class="muted">Total claims</div><div class="stat-value">{{ stats.total_claims }}</div></div>
+        <div class="stat-card"><div class="muted">Pending</div><div class="stat-value">{{ stats.pending_claims }}</div></div>
+        <div class="stat-card"><div class="muted">Approved</div><div class="stat-value">{{ stats.approved_claims }}</div></div>
+        <div class="stat-card"><div class="muted">Rejected</div><div class="stat-value">{{ stats.rejected_claims }}</div></div>
+        <div class="stat-card"><div class="muted">Escalated</div><div class="stat-value">{{ stats.escalated_claims }}</div></div>
+        <div class="stat-card"><div class="muted">Fraud flagged</div><div class="stat-value">{{ stats.fraud_flagged }}</div></div>
+        <div class="stat-card"><div class="muted">High risk</div><div class="stat-value">{{ stats.high_risk }}</div></div>
+        <div class="stat-card"><div class="muted">Govt employees</div><div class="stat-value">{{ stats.govt_employees_count }}</div></div>
+        <div class="stat-card"><div class="muted">Verified employees</div><div class="stat-value">{{ stats.verified_employees_count }}</div></div>
+        <div class="stat-card"><div class="muted">Hospitals / officers</div><div class="stat-value">{{ stats.hospitals_count }} / {{ stats.officers_count }}</div></div>
+    </div>
+
+    <div class="section-grid" style="margin-top:1rem;">
+        <section class="hero-panel" style="background: var(--surface-strong);">
+            <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+                <div class="card">
+                    <div class="section-heading">
+                        <div>
+                            <span class="section-kicker">Volume</span>
+                            <h3>Monthly claim trends</h3>
+                        </div>
+                    </div>
+                    <canvas id="monthlyTrendsChart" height="250"></canvas>
+                </div>
+                <div class="card">
+                    <div class="section-heading">
+                        <div>
+                            <span class="section-kicker">Resolution</span>
+                            <h3>Claim resolution ratio</h3>
+                        </div>
+                    </div>
+                    <canvas id="approvalRatioChart" height="250"></canvas>
+                </div>
+                <div class="card">
+                    <div class="section-heading">
+                        <div>
+                            <span class="section-kicker">Departments</span>
+                            <h3>Department-wise distribution</h3>
+                        </div>
+                    </div>
+                    <canvas id="deptClaimsChart" height="250"></canvas>
+                </div>
+                <div class="card">
+                    <div class="section-heading">
+                        <div>
+                            <span class="section-kicker">Risk</span>
+                            <h3>Fraud risk levels</h3>
+                        </div>
+                    </div>
+                    <canvas id="fraudDistChart" height="250"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <aside class="hero-panel" style="background: var(--surface-strong);">
+            <div class="section-heading">
+                <div>
+                    <span class="section-kicker">Reviewer telemetry</span>
+                    <h2>Caseload and distribution</h2>
+                </div>
+            </div>
+
+            <div class="grid" style="grid-template-columns: 1fr; gap: 1rem; margin-top:1rem;">
+                <div class="card">
+                    <h3>Hospital usage profile</h3>
+                    <canvas id="hospitalUsageChart" height="220"></canvas>
+                </div>
+                <div class="card">
+                    <h3>Officer case distribution</h3>
+                    <canvas id="officerActivityChart" height="220"></canvas>
+                </div>
+            </div>
+
+            <div class="insight-grid" style="margin-top:1rem;">
+                <div class="insight-card">
+                    <h3>Operational lens</h3>
+                    <p>Use the charts to understand whether activity is concentrated in a few hospitals, departments, or reviewers.</p>
+                </div>
+                <div class="insight-card">
+                    <h3>AI posture</h3>
+                    <p>The resolution ratio and fraud mix help spot workload imbalances or quality issues before they spread.</p>
+                </div>
+            </div>
+        </aside>
     </div>
 </div>
+{% endblock %}
 
-<!-- Row 2: Departments & Risks -->
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem;">
-    <div class="card" style="margin: 0; padding: 1.5rem;">
-        <h3><i class="fas fa-sitemap"></i> Department-wise Claim Distribution</h3>
-        <div style="height: 300px; margin-top: 1rem;">
-            <canvas id="deptClaimsChart"></canvas>
-        </div>
-    </div>
-    <div class="card" style="margin: 0; padding: 1.5rem;">
-        <h3><i class="fas fa-shield-alt"></i> Fraud Risk level Distribution</h3>
-        <div style="height: 300px; margin-top: 1rem;">
-            <canvas id="fraudDistChart"></canvas>
-        </div>
-    </div>
-</div>
-
-<!-- Row 3: Hospitals & Officers -->
-<div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 2rem; margin-bottom: 2rem;">
-    <div class="card" style="margin: 0; padding: 1.5rem;">
-        <h3><i class="fas fa-hospital"></i> Hospital Usage Profile (Total Claims)</h3>
-        <div style="height: 300px; margin-top: 1rem;">
-            <canvas id="hospitalUsageChart"></canvas>
-        </div>
-    </div>
-    <div class="card" style="margin: 0; padding: 1.5rem;">
-        <h3><i class="fas fa-clipboard-list"></i> Officer Case Distribution</h3>
-        <div style="height: 300px; margin-top: 1rem;">
-            <canvas id="officerActivityChart"></canvas>
-        </div>
-    </div>
-</div>
-
-<!-- ChartJS Integration -->
+{% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        // Theme Colors
-        const primary = '#004a99';
-        const success = '#28a745';
-        const danger = '#dc3545';
-        const warning = '#ffc107';
-        const gray = '#6c757d';
+        const palette = {
+            primary: "#2563eb",
+            teal: "#0f766e",
+            amber: "#f59e0b",
+            rose: "#ef4444",
+            violet: "#8b5cf6",
+            emerald: "#10b981"
+        };
 
-        // 1. Monthly Trends Chart (Line)
         new Chart(document.getElementById('monthlyTrendsChart'), {
             type: 'line',
             data: {
                 labels: {{ monthly_data.labels | tojson }},
                 datasets: [{
-                    label: 'Total Reimbursements Filed',
+                    label: 'Claims filed',
                     data: {{ monthly_data.values | tojson }},
-                    borderColor: primary,
-                    backgroundColor: 'rgba(0, 74, 153, 0.1)',
-                    tension: 0.3,
+                    borderColor: palette.primary,
+                    backgroundColor: 'rgba(37, 99, 235, 0.14)',
+                    tension: 0.32,
                     fill: true,
                     borderWidth: 3
                 }]
@@ -152,14 +141,13 @@
             }
         });
 
-        // 2. Claim Approval Ratio Chart (Doughnut)
         new Chart(document.getElementById('approvalRatioChart'), {
             type: 'doughnut',
             data: {
                 labels: {{ approval_ratio.labels | tojson }},
                 datasets: [{
                     data: {{ approval_ratio.values | tojson }},
-                    backgroundColor: [success, danger, warning, '#17a2b8']
+                    backgroundColor: [palette.emerald, palette.rose, palette.amber, palette.violet]
                 }]
             },
             options: {
@@ -169,15 +157,14 @@
             }
         });
 
-        // 3. Department-wise Claims (Bar)
         new Chart(document.getElementById('deptClaimsChart'), {
             type: 'bar',
             data: {
                 labels: {{ dept_data.labels | tojson }},
                 datasets: [{
-                    label: 'Claims Filed',
+                    label: 'Claims',
                     data: {{ dept_data.values | tojson }},
-                    backgroundColor: '#4472c4'
+                    backgroundColor: palette.violet
                 }]
             },
             options: {
@@ -188,14 +175,13 @@
             }
         });
 
-        // 4. Fraud Risk level (Pie)
         new Chart(document.getElementById('fraudDistChart'), {
             type: 'pie',
             data: {
                 labels: {{ fraud_data.labels | tojson }},
                 datasets: [{
                     data: {{ fraud_data.values | tojson }},
-                    backgroundColor: [success, warning, danger]
+                    backgroundColor: [palette.emerald, palette.amber, palette.rose]
                 }]
             },
             options: {
@@ -205,15 +191,14 @@
             }
         });
 
-        // 5. Hospital Usage Chart (Bar)
         new Chart(document.getElementById('hospitalUsageChart'), {
             type: 'bar',
             data: {
                 labels: {{ hospital_data.labels | tojson }},
                 datasets: [{
-                    label: 'Admissions & Claims',
+                    label: 'Claims',
                     data: {{ hospital_data.values | tojson }},
-                    backgroundColor: '#ed7d31'
+                    backgroundColor: palette.teal
                 }]
             },
             options: {
@@ -224,15 +209,14 @@
             }
         });
 
-        // 6. Officer Caseload Chart (Horizontal Bar)
         new Chart(document.getElementById('officerActivityChart'), {
             type: 'bar',
             data: {
                 labels: {{ officer_data.labels | tojson }},
                 datasets: [{
-                    label: 'Reviewed Claims',
+                    label: 'Reviewed claims',
                     data: {{ officer_data.values | tojson }},
-                    backgroundColor: '#70ad47'
+                    backgroundColor: palette.primary
                 }]
             },
             options: {

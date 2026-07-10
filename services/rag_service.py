@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
 from config.settings import Config
+from utils.cache import ttl_cache
 from services.llm_service import ask_llm
 
 logger = logging.getLogger(__name__)
@@ -205,6 +206,11 @@ def _confidence_from_score(score: float) -> float:
     return round(max(0.0, min(1.0, (float(score) + 1.0) / 2.0)), 4)
 
 
+@ttl_cache(
+    "rag_rules",
+    ttl_seconds=getattr(Config, "EMBEDDING_CACHE_TTL_SECONDS", 3600),
+    key_builder=lambda query, k=5: f"{str(query or '').strip().lower()}::{int(k)}",
+)
 def retrieve_rules(query: str, k: int = 5) -> List[Dict[str, Any]]:
     """
     Retrieve matching government rule chunks.
@@ -245,7 +251,7 @@ def retrieve_rules(query: str, k: int = 5) -> List[Dict[str, Any]]:
 REQUIRED_KEYS = {
     "eligibility", "confidence", "risk_level", "fraud_score",
     "hospital_verified", "reasoning", "recommended_action",
-    "fraud_flags", "missing_documents", "amount_analysis",
+    "fraud_flags", "missing_documents", "amount_analysis", "source_references",
 }
 
 DEFAULTS = {
@@ -259,6 +265,7 @@ DEFAULTS = {
     "fraud_flags": [],
     "missing_documents": [],
     "amount_analysis": {"claimed": 0, "expected_range": "N/A", "status": "anomalous"},
+    "source_references": [],
 }
 
 
@@ -312,6 +319,8 @@ def _validate_schema(result: dict) -> dict:
         result["missing_documents"] = []
     if not isinstance(result["amount_analysis"], dict):
         result["amount_analysis"] = DEFAULTS["amount_analysis"]
+    if not isinstance(result.get("source_references"), list):
+        result["source_references"] = []
 
     result["eligibility"] = str(result["eligibility"]).strip().title()
     result["risk_level"] = str(result["risk_level"]).strip().title()
@@ -408,6 +417,7 @@ Return ONLY valid JSON with NO markdown and NO explanation:
         })
 
     validated = _validate_schema(result)
+    validated["source_references"] = [doc.get("chunk_id") for doc in docs[: min(len(docs), 3)] if doc.get("chunk_id")]
     logger.info(
         "[RAG] Validation complete | eligibility=%s | confidence=%s | risk=%s",
         validated["eligibility"],

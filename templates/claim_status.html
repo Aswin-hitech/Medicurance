@@ -1,70 +1,67 @@
 {% extends "base.html" %}
 
-{% block title %}Claim Status | MediCurance{% endblock %}
+{% block title %}Claim Timeline | MediCurance{% endblock %}
 
 {% block content %}
-<div class="card animate-in">
-    <div class="toolbar" style="margin-bottom:1rem;">
+<div class="hero-shell animate-in">
+    <div class="panel-hero" style="margin-bottom:1rem;">
         <div>
-            <div class="chip"><i class="fa-solid fa-layer-group"></i> Claim history</div>
-            <h1 style="margin-top:0.75rem;">Your submissions</h1>
+            <span class="hero-topline"><i class="fa-solid fa-layer-group"></i> Claim history</span>
+            <h1 style="margin-top:1rem;">Your reimbursement timeline</h1>
+            <p class="muted">Track document progress, AI review summaries, officer remarks, and downloadable letters.</p>
         </div>
         <a href="{{ url_for('user.claim_request') }}" class="btn btn-primary"><i class="fa-solid fa-plus"></i> New claim</a>
     </div>
 
     {% if claims %}
-    <div class="table-wrap">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Claim</th>
-                    <th>Hospital</th>
-                    <th>Amount</th>
-                    <th>Date</th>
-                    <th>Status</th>
-                    <th>Reference</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for claim in claims %}
-                <tr>
-                    <td><strong>#{{ claim.claim_id[-8:] if claim.claim_id else 'N/A' }}</strong></td>
-                    <td>{{ claim.hospital }}</td>
-                    <td>Rs. {{ "{:,.2f}".format(claim.amount) }}</td>
-                    <td>{{ claim.date }}</td>
-                    <td><span class="badge badge-{{ claim.status.lower() }}">{{ claim.status }}</span></td>
-                    <td><strong>{{ claim.letter_reference or 'Pending' }}</strong></td>
-                    <td>
-                        <div class="toolbar" style="justify-content:flex-start;">
-                            <a href="{{ claim.bill_url }}" target="_blank" class="btn btn-secondary btn-sm"><i class="fa-solid fa-file-arrow-up"></i> Bill</a>
-                            {% if claim.status != 'Pending' %}
-                                <a href="{{ url_for('user.generate_letter', claim_id=claim.claim_id, letter_type='officer_to_beneficiary') }}" target="_blank" class="btn btn-secondary btn-sm"><i class="fa-solid fa-eye"></i> View</a>
-                                <a href="{{ url_for('user.download_letter', claim_id=claim.claim_id) }}" class="btn btn-primary btn-sm"><i class="fa-solid fa-file-pdf"></i> Download</a>
-                            {% endif %}
-                        </div>
-                    </td>
-                </tr>
-                <tr>
-                    <td colspan="7">
-                        <div class="analysis-panel">
-                            <div class="analysis-card"><strong>Officer Remarks</strong><p>{{ claim.officer_notes or claim.officer_comments or claim.rejection_reason or 'Awaiting officer remarks.' }}</p></div>
-                            <div class="analysis-card"><strong>Approval Reason</strong><p>{{ claim.approval_reason or claim.ai_reasoning_summary }}</p></div>
-                            <div class="analysis-card"><strong>Government Rule</strong><p>{{ claim.rag_result.status if claim.rag_result else 'Pending rule verification' }}{% if claim.rag_result %} | {{ claim.rag_result.source_document }}{% endif %}</p></div>
-                        </div>
-                        <div class="timeline" style="margin-top:0.75rem;">
-                            {% for item in claim.timeline %}
-                            <div class="timeline-item {{ item.state }}">
-                                <div class="timeline-icon"><i class="fa-solid {{ item.icon }}"></i></div>
-                                <div><strong>{{ item.label }}</strong><p class="muted">{{ item.detail }}</p></div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </td>
-                </tr>
+    <div class="section-grid">
+        {% for claim in claims %}
+        <article class="card" style="margin-bottom:0;">
+            <div class="toolbar" style="margin-bottom:0.75rem;">
+                <div>
+                    <div class="chip">#{{ claim.claim_id[-8:] if claim.claim_id else 'N/A' }}</div>
+                    <h3 style="margin-top:0.75rem;">{{ claim.hospital }}</h3>
+                    <p class="muted">Rs. {{ "{:,.2f}".format(claim.amount) }}</p>
+                </div>
+                <span class="badge badge-{{ claim.status.lower() }}">{{ claim.status }}</span>
+            </div>
+
+            <div class="timeline">
+                {% for item in claim.timeline %}
+                <div class="timeline-item {{ item.state }}">
+                    <div class="timeline-icon"><i class="fa-solid {{ item.icon }}"></i></div>
+                    <div>
+                        <strong>{{ item.label }}</strong>
+                        <p class="muted">{{ item.detail }}</p>
+                    </div>
+                </div>
                 {% endfor %}
-            </tbody>
-        </table>
+            </div>
+
+            <div class="analysis-panel" style="margin-top:1rem;">
+                <div class="analysis-card">
+                    <strong>Officer notes</strong>
+                    <p>{{ claim.officer_notes or claim.officer_comments or claim.rejection_reason or 'Awaiting officer remarks.' }}</p>
+                </div>
+                <div class="analysis-card">
+                    <strong>Policy result</strong>
+                    <p>{{ claim.rag_result.status if claim.rag_result else 'Pending rule verification' }}{% if claim.rag_result %}<br>{{ claim.rag_result.source_document }}{% endif %}</p>
+                </div>
+                <div class="analysis-card">
+                    <strong>AI summary</strong>
+                    <p>{{ claim.ai_reasoning_summary or claim.recommendation.summary or 'Processing is underway.' }}</p>
+                </div>
+            </div>
+
+            <div class="toolbar" style="margin-top:1rem; justify-content:flex-start;">
+                <a href="{{ claim.bill_url }}" target="_blank" class="btn btn-secondary btn-sm"><i class="fa-solid fa-file-arrow-up"></i> Bill</a>
+                {% if claim.status != 'Pending' %}
+                    <a href="{{ url_for('user.generate_letter', claim_id=claim.claim_id, letter_type='officer_to_beneficiary') }}" target="_blank" class="btn btn-secondary btn-sm"><i class="fa-solid fa-eye"></i> View letter</a>
+                    <a href="{{ url_for('user.download_letter', claim_id=claim.claim_id) }}" class="btn btn-primary btn-sm"><i class="fa-solid fa-file-pdf"></i> Download</a>
+                {% endif %}
+            </div>
+        </article>
+        {% endfor %}
     </div>
 
     {% if total_pages and total_pages > 1 %}

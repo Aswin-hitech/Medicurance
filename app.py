@@ -1,14 +1,16 @@
-import socket
 from importlib.util import find_spec
 from pathlib import Path
 
-from flask import Flask, flash, jsonify, redirect, request, session, url_for
-from werkzeug.exceptions import HTTPException
+import socket
+import uuid
+
+from flask import Flask, g, request
 from config.settings import Config
 from flask_wtf.csrf import CSRFProtect
 from datetime import timedelta
 from utils.rate_limiter import limiter
 from utils.logger import logger
+from utils.exceptions import register_error_handlers
 
 app = Flask(__name__)
 app.secret_key = Config.SECRET_KEY
@@ -30,6 +32,9 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
 app.config['MAX_CONTENT_LENGTH'] = Config.UPLOAD_MAX_SIZE
 app.config["DEBUG"] = Config.FLASK_ENV == "development"
+app.config["SESSION_REFRESH_EACH_REQUEST"] = True
+app.config["PREFERRED_URL_SCHEME"] = "https" if Config.FLASK_ENV != "development" else "http"
+app.config["JSON_SORT_KEYS"] = False
 
 csrf = CSRFProtect(app)
 if hasattr(limiter, "init_app"):
@@ -42,36 +47,41 @@ app.register_blueprint(officer_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(api_bp)
 
-# Error handling or global routes can go here
-@app.errorhandler(404)
-def page_not_found(e):
-    return redirect(url_for('auth.login'))
+register_error_handlers(app)
 
 
-@app.errorhandler(413)
-def request_too_large(e):
-    flash("The uploaded file is too large. Please choose a smaller file.", "danger")
-    return redirect(request.referrer or url_for("user.claim_request"))
+@app.before_request
+def _assign_request_context():
+    g.request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
 
 
-@app.errorhandler(Exception)
-def unhandled_exception(e):
-    if isinstance(e, HTTPException):
-        return e
+@app.after_request
+def _apply_security_headers(response):
+    response.headers["X-Request-ID"] = getattr(g, "request_id", str(uuid.uuid4()))
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self' https:; "
+        "img-src 'self' data: https:; "
+        "script-src 'self' https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com 'unsafe-inline'; "
+        "style-src 'self' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net 'unsafe-inline'; "
+        "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com data:; "
+        "connect-src 'self' https:"
+    )
 
-    logger.exception("[ERROR] Unhandled application error: %s", e)
-    if request.path.startswith("/api/"):
-        return jsonify({"error": "internal_server_error", "message": "Something went wrong."}), 500
-
-    flash("Something went wrong. Please try again.", "danger")
-    role = str(session.get("role", "")).strip().lower()
-    if role == "admin":
-        return redirect(url_for("admin.dashboard"))
-    if role == "officer":
-        return redirect(url_for("officer.dashboard"))
-    if role == "user" and session.get("authenticated"):
-        return redirect(url_for("user.dashboard"))
-    return redirect(url_for("auth.login"))
+    origin = request.headers.get("Origin")
+    allowed_origins = {item.strip() for item in str(Config.CORS_ALLOWED_ORIGINS or "").split(",") if item.strip()}
+    if origin and origin in allowed_origins:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Vary"] = "Origin"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Request-ID"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    return response
 
 
 def _local_ip():

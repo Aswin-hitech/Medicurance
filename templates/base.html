@@ -5,18 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="color-scheme" content="light dark">
     <title>{% block title %}MediCurance{% endblock %}</title>
+    <meta name="description" content="Enterprise AI medical claims platform for government and healthcare deployments.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     {% block head %}{% endblock %}
 </head>
 <body>
+    <a class="skip-link" href="#mainContent">Skip to content</a>
     <nav class="navbar">
         <div class="navbar-container">
             <a href="{{ url_for('auth.login') }}" class="navbar-brand">
                 <img src="{{ url_for('static', filename='assets/medicurance_logo.png') }}" alt="MediCurance" class="brand-logo" onerror="this.style.display='none'">
                 <span>
                     MediCurance
-                    <small>Tamil Nadu Government Medical Reimbursement Portal</small>
+                    <small>Enterprise claims intelligence platform</small>
                 </span>
             </a>
             <div class="navbar-menu">
@@ -38,6 +43,12 @@
                     <a href="{{ url_for('auth.login') }}" class="nav-link">Login</a>
                     <a href="{{ url_for('auth.register_page') }}" class="nav-link">Register</a>
                 {% endif %}
+                {% if session.get('authenticated') %}
+                <div class="nav-meta">
+                    <span class="nav-meta-label">Role</span>
+                    <span class="nav-meta-value">{{ session.get('role', 'user')|title }}</span>
+                </div>
+                {% endif %}
                 <button type="button" class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
                     <i class="fa-solid fa-moon"></i>
                 </button>
@@ -58,13 +69,13 @@
         {% endwith %}
     </div>
 
-    <main class="page-shell">
+    <main class="page-shell" id="mainContent">
         {% block content %}{% endblock %}
     </main>
 
     <footer class="footer">
         <div class="page-shell">
-            <p>&copy; 2026 MediCurance | Tamil Nadu Government Medical Reimbursement Services</p>
+            <p>&copy; 2026 MediCurance | Enterprise AI claims platform</p>
         </div>
     </footer>
 

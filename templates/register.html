@@ -1,77 +1,107 @@
 {% extends "base.html" %}
 
-{% block title %}Register - MediCurance{% endblock %}
+{% block title %}Register | MediCurance{% endblock %}
 
 {% block content %}
-<div class="card" style="max-width: 500px; margin: 2rem auto;">
-    <div class="card-header" style="text-align: center;">
-        <h2><i class="fas fa-user-plus"></i> Create New Account</h2>
-        <p class="text-muted">Register for the Government Medical Reimbursement Portal</p>
-    </div>
+<div class="hero-shell animate-in">
+    <div class="hero-grid">
+        <section class="hero-panel">
+            <span class="hero-topline"><i class="fa-solid fa-id-card"></i> Account setup</span>
+            <h1 style="margin-top:1rem;">Create your claims workspace</h1>
+            <p class="muted" style="max-width: 56ch;">Register once to access reimbursement tracking, identity verification, and secure claim submission across devices.</p>
 
-    <form action="{{ url_for('auth.register_submit') }}" method="POST" id="registerForm">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <div class="form-group">
-            <label class="form-label"><i class="fas fa-mobile-alt"></i> Mobile Number</label>
-            <input type="text" name="mobile" class="form-control" placeholder="10-digit mobile number" required
-                pattern="[0-9]{10}" maxlength="10">
-        </div>
-
-        <div class="form-group">
-            <label class="form-label"><i class="fas fa-lock"></i> Password</label>
-            <input type="password" name="password" id="password" class="form-control"
-                placeholder="Create a strong password" required minlength="8">
-            <small class="text-muted">Use 8+ characters with uppercase, lowercase, number, and special character.</small>
-        </div>
-
-        <div class="form-group">
-            <label class="form-label"><i class="fas fa-lock"></i> Confirm Password</label>
-            <input type="password" name="confirm_password" id="confirm_password" class="form-control"
-                placeholder="Re-enter your password" required>
-        </div>
-
-        <div class="alert alert-danger" id="passwordError" style="display: none;">
-            Passwords do not match!
-        </div>
-
-        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
-            <div class="form-group">
-                <label class="form-label">Employee ID</label>
-                <input type="text" name="employee_id" class="form-control" placeholder="Official employee ID" required>
+            <div class="insight-grid" style="margin-top:1.25rem;">
+                <div class="insight-card">
+                    <div class="muted">Identity</div>
+                    <h3>Govt-linked</h3>
+                    <p class="muted">Registration checks your government employee record.</p>
+                </div>
+                <div class="insight-card">
+                    <div class="muted">Security</div>
+                    <h3>Strong passwords</h3>
+                    <p class="muted">Policy-enforced authentication from day one.</p>
+                </div>
+                <div class="insight-card">
+                    <div class="muted">Access</div>
+                    <h3>Role-aware</h3>
+                    <p class="muted">User, officer, and admin routes stay separated.</p>
+                </div>
             </div>
-            <div class="form-group">
-                <label class="form-label">Full Name</label>
-                <input type="text" name="full_name" class="form-control" placeholder="As per government record" required>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Date of Birth</label>
-                <input type="date" name="date_of_birth" class="form-control" required>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Aadhaar Number</label>
-                <input type="text" name="aadhaar_number" class="form-control" placeholder="12-digit Aadhaar" required pattern="[0-9 ]{12,14}">
-            </div>
-            <div class="form-group">
-                <label class="form-label">Department</label>
-                <input type="text" name="department" class="form-control" required>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Designation</label>
-                <input type="text" name="designation" class="form-control" required>
-            </div>
-        </div>
+        </section>
 
-        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.8rem;">
-            Complete Registration
-        </button>
-    </form>
+        <section class="hero-panel" style="background: var(--surface-strong);">
+            <div class="card-header">
+                <div class="chip"><i class="fa-solid fa-user-plus"></i> Register</div>
+                <h2 style="margin-top:0.75rem;">New account</h2>
+                <p class="muted">Complete the form to link your identity record.</p>
+            </div>
 
-    <div
-        style="margin-top: 1.5rem; text-align: center; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
-        <p>Already have an account? <a href="{{ url_for('auth.login') }}">Login here</a></p>
+            <form action="{{ url_for('auth.register_submit') }}" method="POST" id="registerForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+                    <div class="form-group">
+                        <label class="form-label">Mobile Number</label>
+                        <input type="text" name="mobile" class="form-control" placeholder="10-digit mobile number" required pattern="[0-9]{10}" maxlength="10">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" name="email" class="form-control" placeholder="name@department.gov.in">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Employee ID</label>
+                        <input type="text" name="employee_id" class="form-control" placeholder="Official employee ID" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Full Name</label>
+                        <input type="text" name="full_name" class="form-control" placeholder="As per government record" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Date of Birth</label>
+                        <input type="date" name="date_of_birth" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Aadhaar Number</label>
+                        <input type="text" name="aadhaar_number" class="form-control" placeholder="12-digit Aadhaar" required pattern="[0-9 ]{12,14}">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Department</label>
+                        <input type="text" name="department" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Designation</label>
+                        <input type="text" name="designation" class="form-control" required>
+                    </div>
+                </div>
+
+                <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input type="password" name="password" id="password" class="form-control" placeholder="Create a strong password" required minlength="8">
+                        <small class="text-muted">Use 8+ characters with uppercase, lowercase, number, and special character.</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Confirm Password</label>
+                        <input type="password" name="confirm_password" id="confirm_password" class="form-control" placeholder="Re-enter your password" required>
+                    </div>
+                </div>
+
+                <div class="toast toast-danger" id="passwordError" style="display:none; margin-bottom:1rem;">Passwords do not match.</div>
+
+                <button type="submit" class="btn btn-primary w-100">Complete registration</button>
+            </form>
+
+            <div class="card" style="margin-top:1rem; margin-bottom:0; background: var(--bg-elevated);">
+                <div class="toolbar">
+                    <span class="muted">Already have an account?</span>
+                    <a href="{{ url_for('auth.login') }}" class="btn btn-secondary btn-sm">Go to login</a>
+                </div>
+            </div>
+        </section>
     </div>
 </div>
+{% endblock %}
 
+{% block scripts %}
 <script>
     document.getElementById('registerForm').addEventListener('submit', function (e) {
         const password = document.getElementById('password').value;
@@ -81,10 +111,11 @@
         if (password !== confirm) {
             e.preventDefault();
             errorDiv.style.display = 'block';
+            errorDiv.textContent = 'Passwords do not match.';
         } else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(password)) {
             e.preventDefault();
-            errorDiv.textContent = 'Password must include uppercase, lowercase, number, and special character.';
             errorDiv.style.display = 'block';
+            errorDiv.textContent = 'Password must include uppercase, lowercase, number, and special character.';
         } else {
             errorDiv.style.display = 'none';
         }
