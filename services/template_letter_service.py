@@ -118,7 +118,7 @@ def _append_meta_block(doc, data):
         ("Reference Number", data.get("letter_reference") or data.get("claim_reference")),
         ("Claim ID", data.get("claim_id")),
         ("Beneficiary", data.get("beneficiary_name")),
-        ("Employee ID", data.get("employee_id")),
+        ("PPO Number", data.get("ppo_number") or data.get("employee_id")),
         ("Hospital", data.get("hospital")),
         ("Amount", data.get("amount")),
         ("Status", data.get("status")),

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Document Center | MediCurance{% endblock %}
+
+{% block content %}
+<div class="hero-shell animate-in">
+    <div class="panel-hero">
+        <div>
+            <span class="hero-topline"><i class="fa-solid fa-folder-open"></i> Document Center</span>
+            <h1>Manage your pension documents</h1>
+            <p class="muted">Upload, replace, view, download, or remove the records linked to your account.</p>
+        </div>
+        <div class="toolbar">
+            <a href="{{ url_for('user.profile') }}" class="btn btn-secondary btn-sm">Back to profile</a>
+        </div>
+    </div>
+
+    <div class="card">
+        <form action="{{ url_for('user.document_center') }}" method="POST" enctype="multipart/form-data" class="toolbar">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <select name="document_type" class="form-control" style="max-width:280px;">
+                <option value="profilePhoto">Profile Photo</option>
+                <option value="ppo">PPO Certificate</option>
+                <option value="aadhaar">Aadhaar Card</option>
+                <option value="pan">PAN Card</option>
+                <option value="voterId">Voter ID</option>
+                <option value="bankPassbook">Bank Passbook</option>
+                <option value="digitalLifeCertificate">Digital Life Certificate</option>
+                <option value="pensionPhotoCard">Pensioner Photo Card</option>
+            </select>
+            <input type="file" name="file" class="form-control" style="max-width:320px;" required>
+            <button class="btn btn-primary" type="submit">Upload</button>
+        </form>
+    </div>
+
+    <div class="section-grid" style="margin-top:1rem;">
+        {% for doc in documents %}
+        <div class="card">
+            <h3>{{ doc.document_type }}</h3>
+            <p class="muted">{{ doc.upload_time or doc.created_at }}</p>
+            <p><strong>Status:</strong> {{ 'Verified' if doc.verified else 'Pending' }}</p>
+            <div class="toolbar">
+                {% if doc.url %}
+                <a class="btn btn-secondary btn-sm" href="{{ doc.url }}" target="_blank">View / Download</a>
+                {% endif %}
+                <form action="{{ url_for('user.delete_document', document_type=doc.document_type) }}" method="POST" onsubmit="return confirm('Delete this document?')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-secondary btn-sm" type="submit">Delete</button>
+                </form>
+            </div>
+        </div>
+        {% else %}
+        <div class="card">
+            <p class="muted">No documents uploaded yet.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

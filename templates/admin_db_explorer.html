@@ -56,9 +56,9 @@
             <select name="sort" class="form-control">
                 <option value="_id" {% if sort_by == '_id' %}selected{% endif %}>Primary ID (_id)</option>
                 <option value="created_at" {% if sort_by == 'created_at' %}selected{% endif %}>Created Timestamp</option>
-                {% if active_collection in ['users', 'govtlist', 'government_officers'] %}
+                {% if active_collection in ['users', 'govtlist', 'govtofficers'] %}
                 <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Name</option>
-                <option value="employee_id" {% if sort_by == 'employee_id' %}selected{% endif %}>Employee ID</option>
+                <option value="aadhaar_number" {% if sort_by == 'aadhaar_number' %}selected{% endif %}>Aadhaar Number</option>
                 {% elif active_collection == 'claims' %}
                 <option value="claim_id" {% if sort_by == 'claim_id' %}selected{% endif %}>Claim ID</option>
                 <option value="amount" {% if sort_by == 'amount' %}selected{% endif %}>Amount</option>
@@ -114,9 +114,9 @@
                         <strong>Claim ID: {{ record.doc.claim_id[-12:] }}</strong><br>
                         <span>Claimant: {{ record.doc.name }}</span>
                         {% elif active_collection == 'govtlist' %}
-                        <strong>Emp ID: {{ record.doc.employee_id }}</strong><br>
+                        <strong>Aadhaar: {{ record.doc.aadhaar_number or record.doc.identity.aadhaar_number or record.doc.identity.aadhaarLast4 or 'N/A' }}</strong><br>
                         <span>Name: {{ record.doc.name }}</span>
-                        {% elif active_collection == 'government_officers' %}
+                        {% elif active_collection == 'govtofficers' %}
                         <strong>Officer ID: {{ record.doc.officer_id }}</strong><br>
                         <span>Name: {{ record.doc.name }}</span>
                         {% elif active_collection == 'admins' %}
@@ -124,7 +124,7 @@
                         <span>Name: {{ record.doc.name }}</span>
                         {% elif active_collection == 'hospitals' %}
                         <strong>{{ record.doc.name }}</strong><br>
-                        <small class="text-muted">{{ record.doc.city }}, {{ record.doc.state }}</small>
+                        <small class="text-muted">{{ record.doc.hospitalId or record.doc.nhisCode or 'N/A' }}</small>
                         {% elif active_collection == 'otp' %}
                         <strong>Mobile: {{ record.doc.mobile }}</strong><br>
                         <small class="text-muted">OTP: {{ record.doc.otp }}</small>
@@ -140,12 +140,15 @@
                         Hospital: {{ record.doc.hospital }}<br>Amount: <strong>₹{{ "{:,.2f}".format(record.doc.amount) }}</strong> | Status: <span class="badge badge-pending">{{ record.doc.status }}</span>
                         {% elif active_collection == 'govtlist' %}
                         Dept: {{ record.doc.department }} | Desg: {{ record.doc.designation }}<br>Policy No: {{ record.doc.policy_number or 'N/A' }}
-                        {% elif active_collection == 'government_officers' %}
+                        {% elif active_collection == 'govtofficers' %}
                         Dept: {{ record.doc.department }} | Dist: {{ record.doc.district }}<br>Status: {{ record.doc.status }}
                         {% elif active_collection == 'admins' %}
                         Role: {{ record.doc.role }} | Joined: {{ record.doc.created_at[:10] if record.doc.created_at else 'N/A' }}
                         {% elif active_collection == 'hospitals' %}
-                        Network: <span class="badge {% if record.doc.network %}badge-approved{% else %}badge-rejected{% endif %}">{{ 'IN-NETWORK' if record.doc.network else 'OUT' }}</span>
+                        District: {{ record.doc.district or 'N/A' }}<br>
+                        Cluster: {{ record.doc.cluster or 'N/A' }}<br>
+                        Cashless: <span class="badge {% if record.doc.cashless %}badge-approved{% else %}badge-rejected{% endif %}">{{ 'YES' if record.doc.cashless else 'NO' }}</span><br>
+                        Scheme: {{ (record.doc.schemes or ['N/A'])[0] }}
                         {% elif active_collection == 'otp' %}
                         Timestamp: {{ record.doc.timestamp }}
                         {% else %}

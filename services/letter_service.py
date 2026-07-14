@@ -55,7 +55,7 @@ def _build_beneficiary_letter(claim):
         "Thank you for your kind consideration.",
         "Yours faithfully,",
         _safe_text(claim.get("name")) or "Beneficiary",
-        f"Employee ID: {_safe_text(claim.get('employee_id')) or 'N/A'}",
+        f"PPO Number: {_safe_text(claim.get('ppo_number') or claim.get('employee_id')) or 'N/A'}",
     ])
 
 

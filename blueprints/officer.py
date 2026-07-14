@@ -1,7 +1,8 @@
+from datetime import datetime
 from flask import Blueprint, render_template, redirect, session, flash, url_for, request
 from utils.auth_utils import role_required
 from database.mongo_client import claims_collection
-from services.workflow_service import record_claim_status_change
+from services.workflow_service import record_claim_status_change, reserve_claim_for_officer, claim_is_locked_for_officer
 from services.letter_generator import generate_pdf_letter
 from services.claim_view_service import enrich_claim_for_view
 from utils.status_utils import normalize_claim_status
@@ -61,6 +62,12 @@ def review_page(claim_id):
     if not claim:
         flash("Claim not found", "danger")
         return redirect(url_for('officer.dashboard'))
+    officer_name = session.get("officer_name") or session.get("user_name") or session.get("mobile") or "Claims Officer"
+    officer_id = session.get("user_id") or session.get("mobile")
+    reserve = reserve_claim_for_officer(claim_id, officer_name, officer_id=officer_id, actor=session.get("mobile", "officer"))
+    if not reserve.get("ok") and reserve.get("status") == "locked":
+        flash(reserve.get("message", "Claim is already being handled by another officer."), "warning")
+        return redirect(url_for("officer.dashboard"))
     claim = enrich_claim_for_view(claim)
     return render_template("officer_claim_review.html", claim=claim)
 
@@ -75,6 +82,11 @@ def approve(claim_id):
         log_audit(actor, "security_violation", f"Invalid approve attempt for claim {claim_id}")
         flash("Claim is not available for approval.", "danger")
         return redirect(url_for('officer.dashboard'))
+    officer_name = session.get("officer_name") or session.get("user_name") or session.get("mobile") or "Claims Officer"
+    officer_id = session.get("user_id") or session.get("mobile")
+    if claim_is_locked_for_officer(claim, officer_name, officer_id):
+        flash(f"This claim is already handled by {claim.get('handled_by')}.", "warning")
+        return redirect(url_for('officer.dashboard'))
     record_claim_status_change(
         claim_id=claim_id,
         old_status="Pending",
@@ -85,6 +97,9 @@ def approve(claim_id):
             "officer_notes": notes,
             "approval_reason": notes,
             "sanctioned_amount": float(sanctioned_amount or claim.get("amount") or 0),
+            "handled_by": officer_name,
+            "handled_by_id": officer_id,
+            "handled_at": datetime.now().isoformat(),
         }
     )
     updated_claim = claims_collection.find_one({"claim_id": claim_id}) or claim
@@ -108,6 +123,11 @@ def reject(claim_id):
         log_audit(actor, "security_violation", f"Invalid reject attempt for claim {claim_id}")
         flash("Claim is not available for rejection.", "danger")
         return redirect(url_for('officer.dashboard'))
+    officer_name = session.get("officer_name") or session.get("user_name") or session.get("mobile") or "Claims Officer"
+    officer_id = session.get("user_id") or session.get("mobile")
+    if claim_is_locked_for_officer(claim, officer_name, officer_id):
+        flash(f"This claim is already handled by {claim.get('handled_by')}.", "warning")
+        return redirect(url_for('officer.dashboard'))
     record_claim_status_change(
         claim_id=claim_id,
         old_status="Pending",
@@ -118,6 +138,9 @@ def reject(claim_id):
             "rejection_reason": reason,
             "officer_comments": comments,
             "officer_notes": comments,
+            "handled_by": officer_name,
+            "handled_by_id": officer_id,
+            "handled_at": datetime.now().isoformat(),
         }
     )
     updated_claim = claims_collection.find_one({"claim_id": claim_id}) or claim
@@ -130,6 +153,41 @@ def reject(claim_id):
     flash(f"Claim {claim_id[-8:]} rejected.", "warning")
     return redirect(url_for('officer.dashboard'))
 
+@officer_bp.route("/hold_claim/<claim_id>", methods=["POST"])
+@role_required("officer")
+def hold_claim(claim_id):
+    reason = request.form.get("reason")
+    actor = session.get("mobile", "officer")
+    claim = claims_collection.find_one({"claim_id": claim_id})
+    if not claim or normalize_claim_status(claim.get("status")) != "Pending":
+        log_audit(actor, "security_violation", f"Invalid hold attempt for claim {claim_id}")
+        flash("Claim is not available for hold.", "danger")
+        return redirect(url_for('officer.dashboard'))
+    officer_name = session.get("officer_name") or session.get("user_name") or session.get("mobile") or "Claims Officer"
+    officer_id = session.get("user_id") or session.get("mobile")
+    if claim_is_locked_for_officer(claim, officer_name, officer_id):
+        flash(f"This claim is already handled by {claim.get('handled_by')}.", "warning")
+        return redirect(url_for('officer.dashboard'))
+    
+    record_claim_status_change(
+        claim_id=claim_id,
+        old_status="Pending",
+        new_status="Hold",
+        actor=actor,
+        reason=f"Placed on hold: {reason}",
+        update_fields={
+            "hold_reason": reason,
+            "officer_notes": reason,
+            "handled_by": officer_name,
+            "handled_by_id": officer_id,
+            "handled_at": datetime.now().isoformat(),
+        }
+    )
+    
+    log_audit(actor, "hold_claim", f"Placed claim {claim_id} on hold", {"reason": reason})
+    flash(f"Claim {claim_id[-8:]} placed on hold pending beneficiary action.", "warning")
+    return redirect(url_for('officer.dashboard'))
+
 @officer_bp.route("/escalate/<claim_id>", methods=["POST"])
 @role_required("officer")
 def escalate(claim_id):
@@ -140,13 +198,23 @@ def escalate(claim_id):
         log_audit(actor, "security_violation", f"Invalid escalate attempt for claim {claim_id}")
         flash("Claim is not available for escalation.", "danger")
         return redirect(url_for('officer.dashboard'))
+    officer_name = session.get("officer_name") or session.get("user_name") or session.get("mobile") or "Claims Officer"
+    officer_id = session.get("user_id") or session.get("mobile")
+    if claim_is_locked_for_officer(claim, officer_name, officer_id):
+        flash(f"This claim is already handled by {claim.get('handled_by')}.", "warning")
+        return redirect(url_for('officer.dashboard'))
     record_claim_status_change(
         claim_id=claim_id,
         old_status="Pending",
         new_status="Escalated",
         actor=actor,
         reason=f"Escalated: {reason}",
-        update_fields={"escalation_reason": reason}
+        update_fields={
+            "escalation_reason": reason,
+            "handled_by": officer_name,
+            "handled_by_id": officer_id,
+            "handled_at": datetime.now().isoformat(),
+        }
     )
     log_audit(actor, "escalate_claim", f"Escalated claim {claim_id}", {"reason": reason})
     flash(f"Claim {claim_id[-8:]} escalated for further review.", "info")

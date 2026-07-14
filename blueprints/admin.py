@@ -4,11 +4,11 @@ import math
 import re
 from pathlib import Path
 
-from flask import Blueprint, current_app, flash, make_response, redirect, render_template, request, session, url_for
+from flask import Blueprint, current_app, flash, make_response, redirect, render_template, request, session, url_for, jsonify
 from utils.auth_utils import role_required
 from config.settings import Config
 from database.mongo_client import claims_collection, db, govt_collection, hospitals_collection, officers_collection, users_collection
-from database.hospital_repository import add_hospital, get_all_hospitals, remove_hospital, update_hospital_network
+from database.hospital_repository import add_hospital, get_all_hospitals, remove_hospital, update_hospital_network, upsert_hospital, get_hospital_by_identifier
 from utils.status_utils import normalize_claim_status
 from services.claim_view_service import enrich_claim_for_view
 from database.government_officer_repository import create_officer_account
@@ -490,15 +490,15 @@ def create_officer_submit():
     from database.government_officer_repository import get_officer_by_identifier
     
     officer_id = request.form.get("officer_id", "").strip()
-    employee_id = request.form.get("employee_id", "").strip()
+    aadhaar_number = request.form.get("aadhaar_number", "").strip()
     phone_number = request.form.get("phone_number", "").strip() or request.form.get("mobile", "").strip() or request.form.get("phone", "").strip()
     email = request.form.get("email", "").strip().lower()
     password = request.form.get("password")
     joining_date = request.form.get("joining_date", "").strip() or request.form.get("date_of_joining", "").strip()
 
-    identifier = officer_id or employee_id or phone_number or email
+    identifier = officer_id or aadhaar_number or phone_number or email
     if not identifier:
-        flash("Officer ID, Employee ID, phone number, or email is required.", "danger")
+        flash("Officer ID, Aadhaar number, phone number, or email is required.", "danger")
         return redirect(url_for('admin.create_officer_page'))
     
     if get_officer_by_identifier(identifier):
@@ -512,12 +512,13 @@ def create_officer_submit():
         
     hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
     officer_payload = {
-        "officer_id": officer_id or employee_id or phone_number or identifier,
-        "employee_id": employee_id or officer_id or phone_number or identifier,
+        "officer_id": officer_id or aadhaar_number or phone_number or identifier,
         "phone_number": phone_number,
         "phone": phone_number,
         "mobile": phone_number,
         "email": email,
+        "aadhaar_number": aadhaar_number,
+        "aadhaar_last4": aadhaar_number[-4:] if aadhaar_number else "",
         "joining_date": joining_date,
         "date_of_joining": joining_date,
         "password": hashed,
@@ -592,40 +593,63 @@ def export_claims_csv():
 @admin_bp.route("/add_hospital", methods=["POST"])
 @role_required("admin")
 def add_hospital_submit():
-    name = request.form.get("name")
-    city = request.form.get("city")
-    state = request.form.get("state")
-    network = request.form.get("network") == "on"
+    hospital_data = {
+        "hospitalId": request.form.get("hospitalId") or request.form.get("hospital_id"),
+        "nhisCode": request.form.get("nhisCode"),
+        "name": request.form.get("name"),
+        "district": request.form.get("district"),
+        "cluster": request.form.get("cluster"),
+        "address": request.form.get("address"),
+        "pincode": request.form.get("pincode"),
+        "phone": [item.strip() for item in request.form.get("phone", "").split(",") if item.strip()],
+        "email": request.form.get("email"),
+        "location": {
+            "type": "Point",
+            "coordinates": [
+                float(request.form.get("longitude") or 0),
+                float(request.form.get("latitude") or 0),
+            ],
+        },
+        "specialties": [item.strip() for item in request.form.get("specialties", "").split(",") if item.strip()],
+        "facilities": [item.strip() for item in request.form.get("facilities", "").split(",") if item.strip()],
+        "schemes": [item.strip() for item in request.form.get("schemes", "TN NHIS 2026").split(",") if item.strip()] or ["TN NHIS 2026"],
+        "cashless": request.form.get("cashless") == "on",
+        "timings": {
+            "opd": request.form.get("opd"),
+            "emergency": request.form.get("emergency") == "on",
+        },
+        "status": request.form.get("status") or "active",
+    }
     
     try:
-        result = add_hospital(name, city, state, network)
-        if result is None:
-            flash(f"Hospital '{name}' already exists.", "warning")
-        else:
-            log_audit(session.get("user_id", "admin"), "add_hospital", f"Added hospital {name}", {"network": network})
-            flash(f"Hospital '{name}' added successfully.", "success")
+        existing = get_hospital_by_identifier(hospital_data["hospitalId"]) or get_hospital_by_identifier(hospital_data["nhisCode"])
+        if existing:
+            flash(f"Hospital '{hospital_data['name']}' already exists.", "warning")
+            return redirect(url_for('admin.dashboard'))
+        upsert_hospital(hospital_data)
+        log_audit(session.get("user_id", "admin"), "add_hospital", f"Added hospital {hospital_data['name']}", {"hospitalId": hospital_data["hospitalId"], "nhisCode": hospital_data["nhisCode"]})
+        flash(f"Hospital '{hospital_data['name']}' added successfully.", "success")
     except Exception as e:
         flash(f"Error adding hospital: {str(e)}", "danger")
     return redirect(url_for('admin.dashboard'))
 
-@admin_bp.route("/delete_hospital/<name>", methods=["POST"])
+@admin_bp.route("/delete_hospital/<identifier>", methods=["POST"])
 @role_required("admin")
-def delete_hospital_route(name):
-    remove_hospital(name)
-    log_audit(session.get("user_id", "admin"), "delete_hospital", f"Removed hospital {name}")
-    flash(f"Hospital '{name}' removed.", "warning")
+def delete_hospital_route(identifier):
+    remove_hospital(identifier)
+    log_audit(session.get("user_id", "admin"), "delete_hospital", f"Removed hospital {identifier}")
+    flash(f"Hospital '{identifier}' removed.", "warning")
     return redirect(url_for('admin.dashboard'))
 
-@admin_bp.route("/toggle_hospital_network/<name>", methods=["POST"])
+@admin_bp.route("/toggle_hospital_network/<identifier>", methods=["POST"])
 @role_required("admin")
-def toggle_hospital_network(name):
-    from database.hospital_repository import get_hospital_by_name
-    hospital = get_hospital_by_name(name)
+def toggle_hospital_network(identifier):
+    hospital = get_hospital_by_identifier(identifier)
     if hospital:
-        new_status = not hospital.get("network", False)
-        update_hospital_network(name, new_status)
-        log_audit(session.get("user_id", "admin"), "toggle_hospital_network", f"Changed hospital network status for {name}", {"network": new_status})
-        flash(f"Status for '{name}' updated.", "success")
+        new_status = not hospital.get("cashless", hospital.get("network", False))
+        update_hospital_network(identifier, new_status)
+        log_audit(session.get("user_id", "admin"), "toggle_hospital_network", f"Changed hospital network status for {identifier}", {"cashless": new_status})
+        flash(f"Status for '{identifier}' updated.", "success")
     return redirect(url_for('admin.dashboard'))
 
 # ==========================================
@@ -635,9 +659,17 @@ def toggle_hospital_network(name):
 @admin_bp.route("/govt_database")
 @role_required("admin")
 def govt_database():
-    from database.govt_repository import get_all_employees
-    employees = get_all_employees()
+    from database.govt_repository import get_basic_employee_data
+    employees = get_basic_employee_data()
     return render_template("admin_govt_database.html", employees=employees)
+
+@admin_bp.route("/govt_database/basic")
+@role_required("admin")
+def govt_basic_data():
+    from database.govt_repository import get_basic_employee_data
+    data = get_basic_employee_data()
+    return jsonify(data)
+
 
 @admin_bp.route("/govt_database/upload", methods=["POST"])
 @role_required("admin")
@@ -744,10 +776,10 @@ def govt_database_error_report():
     # Generate CSV in memory
     si = io.StringIO()
     cw = csv.writer(si)
-    cw.writerow(["Row Number", "Employee ID", "Validation Scope", "Error Description"])
+    cw.writerow(["Row Number", "PPO Number", "Validation Scope", "Error Description"])
     
     for err in errors:
-        cw.writerow([err.get("row"), err.get("employee_id"), err.get("field"), err.get("message")])
+        cw.writerow([err.get("row"), err.get("ppo_number") or err.get("employee_id"), err.get("field"), err.get("message")])
         
     output = make_response(si.getvalue())
     output.headers["Content-Disposition"] = "attachment; filename=govt_employee_import_errors.csv"
@@ -792,7 +824,6 @@ def manage_officers_add():
     
     officer_data = {
         "officer_id": request.form.get("officer_id", "").strip(),
-        "employee_id": request.form.get("employee_id", "").strip(),
         "name": request.form.get("name", "").strip(),
         "gender": request.form.get("gender", "").strip(),
         "age": request.form.get("age", "").strip(),
@@ -848,7 +879,6 @@ def manage_officers_edit(officer_id):
     from database.government_officer_repository import update_officer
     
     update_data = {
-        "employee_id": request.form.get("employee_id", "").strip(),
         "name": request.form.get("name", "").strip(),
         "gender": request.form.get("gender", "").strip(),
         "age": request.form.get("age", "").strip(),
@@ -957,7 +987,7 @@ def intelligence_dashboard():
         "fraud_flagged": len([c for c in claims if c.get('ai_result', {}).get('fraud_flags')]),
         "high_risk": len([c for c in claims if str(c.get('ai_result', {}).get('system_risk_level', '')).upper() == 'HIGH']),
         "govt_employees_count": len(govt_employees),
-        "verified_employees_count": len([u for u in users if u.get('is_government_employee')]),
+        "verified_employees_count": len(govt_employees) + len([u for u in users if u.get('is_government_employee')]),
         "hospitals_count": len(hospitals),
         "officers_count": len(officers)
     }
@@ -1051,11 +1081,12 @@ def intelligence_dashboard():
 @admin_bp.route("/trust_analysis")
 @role_required("admin")
 def trust_analysis_dashboard():
-    from database.mongo_client import claims_collection, users_collection, hospitals_collection
+    from database.mongo_client import claims_collection, users_collection, hospitals_collection, govt_collection
     
     claims = list(claims_collection.find().sort("created_at", -1))
     users = list(users_collection.find())
     hospitals = list(hospitals_collection.find())
+    govt_employees = list(govt_collection.find())
     
     mobile_to_user = {u.get('mobile'): u for u in users if u.get('mobile')}
     hospital_dict = {str(h.get('name', '')).strip().lower(): h for h in hospitals if h.get('name')}
@@ -1092,7 +1123,11 @@ def trust_analysis_dashboard():
         
         # 5. Government Employee Verification
         user_doc = mobile_to_user.get(mob)
-        is_govt_verified = user_doc and user_doc.get("is_government_employee")
+        phone_digits = "".join(ch for ch in str(mob or "") if ch.isdigit())
+        is_govt_verified = any(
+            "".join(ch for ch in str(g.get("auth", {}).get("phone") or g.get("mobile") or g.get("phone") or "") if ch.isdigit()) == phone_digits 
+            for g in govt_employees
+        ) or (user_doc and user_doc.get("is_government_employee"))
         govt_verified = 100.0 if is_govt_verified else 40.0
         
         components = trust_result.get("components") or {}
@@ -1189,7 +1224,7 @@ def database_explorer():
     page = int(request.args.get('page', '1'))
     limit = 10
     
-    valid_collections = ['users', 'claims', 'hospitals', 'govtlist', 'government_officers', 'admins', 'documents']
+    valid_collections = ['users', 'claims', 'hospitals', 'govtlist', 'govtofficers', 'admins', 'documents']
     if collection_name not in valid_collections:
         collection_name = 'users'
         
@@ -1207,7 +1242,7 @@ def database_explorer():
             for k in sample_doc.keys():
                 if isinstance(sample_doc[k], str):
                     or_conditions.append({k: search_regex})
-                elif k in ['mobile', 'phone', 'phone_number', 'employee_id', 'claim_id', 'officer_id', 'email']:
+                elif k in ['mobile', 'phone', 'phone_number', 'ppo_number', 'claim_id', 'officer_id', 'email']:
                     or_conditions.append({k: search_query})
             if or_conditions:
                 find_query["$or"] = or_conditions
@@ -1265,7 +1300,7 @@ def db_explorer_export(collection):
     from flask import make_response
     from bson import ObjectId
     
-    valid_collections = ['users', 'claims', 'hospitals', 'govtlist', 'government_officers', 'admins', 'documents']
+    valid_collections = ['users', 'claims', 'hospitals', 'govtlist', 'govtofficers', 'admins', 'documents']
     if collection not in valid_collections:
         flash("Invalid collection selection for export.", "danger")
         return redirect(url_for('admin.database_explorer'))

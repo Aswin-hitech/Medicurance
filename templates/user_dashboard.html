@@ -53,6 +53,16 @@
                     <p class="muted">Check your account and government record.</p>
                     <a href="{{ url_for('user.profile') }}" class="btn btn-secondary w-100">View profile</a>
                 </div>
+                <div class="insight-card">
+                    <h3>Document Center</h3>
+                    <p class="muted">Upload and manage PPO, Aadhaar, PAN, and related records.</p>
+                    <a href="{{ url_for('user.document_center') }}" class="btn btn-secondary w-100">Open documents</a>
+                </div>
+                <div class="insight-card">
+                    <h3>Know Your Claims</h3>
+                    <p class="muted">Search scheme coverage and required documents.</p>
+                    <a href="{{ url_for('user.know_your_claims') }}" class="btn btn-primary w-100">Search claims</a>
+                </div>
             </div>
 
             <div class="card" style="margin-top:1rem; margin-bottom:0; background: var(--bg-elevated);">

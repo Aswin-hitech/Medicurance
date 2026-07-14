@@ -1,7 +1,7 @@
 import logging
 import random
 import shutil
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from database.mongo_client import claims_collection
@@ -57,10 +57,10 @@ def _persist_claim_letter(claim, letter_type, pdf_path, reference):
     safe_type = str(letter_type).replace("/", "_")
     filename = f"{claim_id}_{safe_type}_{reference}.pdf"
     
-    # Upload to Supabase
+    # Upload to Supabase letter bucket (not the bill bucket)
     public_url = upload_file(str(pdf_path), filename=filename, bucket_name=Config.SUPABASE_LETTER_BUCKET)
     
-    generated_at = datetime.utcnow().isoformat() + "Z"
+    generated_at = datetime.now(timezone.utc).isoformat()
     
     update_data = {
         "letter_reference": reference,
@@ -84,21 +84,23 @@ def _persist_claim_letter(claim, letter_type, pdf_path, reference):
 
 def _resolve_employee_id(claim):
     claim = claim or {}
-    employee_id = claim.get("employee_id")
-    if employee_id:
-        return employee_id
+    ppo_number = claim.get("ppo_number")
+    if ppo_number:
+        return ppo_number
 
     mobile = claim.get("mobile")
     if mobile:
         user_doc = get_user_by_mobile(mobile) or {}
-        if user_doc.get("employee_id"):
-            return user_doc.get("employee_id")
+        if user_doc.get("ppo_number"):
+            return user_doc.get("ppo_number")
 
         employee_doc = get_employee_by_mobile(mobile) or {}
-        if employee_doc.get("employee_id"):
-            return employee_doc.get("employee_id")
+        if employee_doc.get("auth", {}).get("ppoNumber"):
+            return employee_doc.get("auth", {}).get("ppoNumber")
+        if employee_doc.get("ppo_number"):
+            return employee_doc.get("ppo_number")
 
-    return ""
+    return claim.get("employee_id") or ""
 
 
 def _resolve_hospital_name(claim):
@@ -128,7 +130,7 @@ def _build_template_data(claim, letter_type, letter_body):
         "claim_reference": reference,
         "letter_reference": reference,
         "beneficiary_name": claim.get("name", ""),
-        "employee_id": _resolve_employee_id(claim),
+        "ppo_number": _resolve_employee_id(claim),
         "hospital": _resolve_hospital_name(claim),
         "amount": _format_amount(claim.get("amount")),
         "sanctioned_amount": _format_amount(claim.get("sanctioned_amount") or claim.get("amount")),

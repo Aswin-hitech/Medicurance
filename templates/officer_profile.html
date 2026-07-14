@@ -7,7 +7,7 @@
     <div class="panel-hero">
         <div>
             <span class="hero-topline"><i class="fa-solid fa-user-tie"></i> Officer profile</span>
-            <h1>{{ officer.get('name', 'Officer') }}</h1>
+            <h1>{{ officer.get('name') or officer.get('auth', {}).get('name') or 'Claims Officer' }}</h1>
             <p class="muted">Manage your official details and review performance snapshots from the same workspace.</p>
         </div>
         <div class="toolbar">
@@ -32,15 +32,35 @@
                         <h3>Identity record</h3>
                     </div>
                 </div>
-                <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
-                    <p><strong>Officer ID:</strong> {{ officer.get('officer_id', '') }}</p>
-                    <p><strong>Employee ID:</strong> {{ officer.get('employee_id', '') }}</p>
-                    <p><strong>Name:</strong> {{ officer.get('name', '') }}</p>
-                    <p><strong>Department:</strong> {{ officer.get('department', '') }}</p>
-                    <p><strong>Designation:</strong> {{ officer.get('designation', '') }}</p>
-                    <p><strong>District:</strong> {{ officer.get('district', '') }}</p>
-                    <p><strong>Joining Date:</strong> {{ officer.get('joining_date', officer.get('date_of_joining', '')) }}</p>
-                    <p><strong>Status:</strong> {{ officer.get('status', 'Active') }}</p>
+                <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem;">
+                    <div>
+                        <p class="muted" style="margin-bottom:0.25rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;">Officer ID</p>
+                        <p style="font-weight: 500;">{{ officer.get('officer_id') or officer.get('employee_id') or 'N/A' }}</p>
+                    </div>
+                    <div>
+                        <p class="muted" style="margin-bottom:0.25rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;">Aadhaar Number</p>
+                        <p style="font-weight: 500;">{{ officer.get('identity', {}).get('aadhaarNumber') or officer.get('aadhaar_number') or 'Not provided' }}</p>
+                    </div>
+                    <div>
+                        <p class="muted" style="margin-bottom:0.25rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;">Full Name</p>
+                        <p style="font-weight: 500;">{{ officer.get('name') or officer.get('auth', {}).get('name') or 'N/A' }}</p>
+                    </div>
+                    <div>
+                        <p class="muted" style="margin-bottom:0.25rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;">Department</p>
+                        <p style="font-weight: 500;">{{ officer.get('permissions', {}).get('department') or officer.get('department') or 'Health Services' }}</p>
+                    </div>
+                    <div>
+                        <p class="muted" style="margin-bottom:0.25rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;">Designation</p>
+                        <p style="font-weight: 500;">{{ officer.get('permissions', {}).get('designation') or officer.get('designation') or 'Verification Officer' }}</p>
+                    </div>
+                    <div>
+                        <p class="muted" style="margin-bottom:0.25rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;">Account Status</p>
+                        <p style="font-weight: 500;">
+                            <span class="badge {% if officer.get('auth', {}).get('accountStatus') == 'Active' %}badge-success{% else %}badge-warning{% endif %}">
+                                {{ officer.get('auth', {}).get('accountStatus') or officer.get('status') or 'Active' }}
+                            </span>
+                        </p>
+                    </div>
                 </div>
             </div>
         </section>
@@ -53,8 +73,16 @@
                         <h3>Reachability</h3>
                     </div>
                 </div>
-                <p><strong>Mobile:</strong> {{ officer.get('mobile', officer.get('phone', '')) }}</p>
-                <p><strong>Email:</strong> {{ officer.get('email', 'Not provided') }}</p>
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <div>
+                        <p class="muted" style="margin-bottom:0.25rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;">Mobile</p>
+                        <p style="font-weight: 500;"><i class="fa-solid fa-phone" style="margin-right: 0.5rem; color: var(--text-muted);"></i> {{ officer.get('auth', {}).get('phone') or officer.get('mobile') or officer.get('phone') or 'Not provided' }}</p>
+                    </div>
+                    <div>
+                        <p class="muted" style="margin-bottom:0.25rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;">Email</p>
+                        <p style="font-weight: 500;"><i class="fa-solid fa-envelope" style="margin-right: 0.5rem; color: var(--text-muted);"></i> {{ officer.get('auth', {}).get('email') or officer.get('email') or 'Not provided' }}</p>
+                    </div>
+                </div>
             </div>
 
             <div class="card">

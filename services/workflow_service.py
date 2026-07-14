@@ -75,6 +75,87 @@ def record_claim_status_change(claim_id, old_status, new_status, actor, reason=N
     return normalized_new
 
 
+def reserve_claim_for_officer(claim_id, officer_name, officer_id=None, actor=None):
+    """
+    Mark a pending claim as being handled by a specific officer.
+    Returns a dict with ok/status/message.
+    """
+    now = datetime.now(timezone.utc).isoformat()
+    claim = claims_collection.find_one({"claim_id": claim_id}) or {}
+    if not claim:
+        return {"ok": False, "status": "missing", "message": "Claim not found."}
+
+    current_owner = str(claim.get("handled_by") or "").strip()
+    current_owner_id = str(claim.get("handled_by_id") or "").strip()
+    officer_name = str(officer_name or "").strip() or "Claims Officer"
+    officer_id = str(officer_id or "").strip() or officer_name
+
+    if current_owner and current_owner_id and (current_owner_id != officer_id or current_owner != officer_name):
+        return {
+            "ok": False,
+            "status": "locked",
+            "message": f"This claim is already handled by {current_owner}.",
+            "handled_by": current_owner,
+            "handled_by_id": current_owner_id,
+        }
+
+    claims_collection.update_one(
+        {
+            "claim_id": claim_id,
+            "$or": [
+                {"handled_by": {"$exists": False}},
+                {"handled_by": ""},
+                {"handled_by_id": {"$exists": False}},
+                {"handled_by_id": ""},
+                {"handled_by_id": officer_id},
+            ],
+        },
+        {"$set": {
+            "handled_by": officer_name,
+            "handled_by_id": officer_id,
+            "handled_at": now,
+            "handled_by_role": "officer",
+            "updated_at": now,
+        }},
+    )
+
+    updated = claims_collection.find_one({"claim_id": claim_id}) or {}
+    if updated.get("handled_by") not in {officer_name} and updated.get("handled_by_id") not in {officer_id}:
+        return {
+            "ok": False,
+            "status": "locked",
+            "message": f"This claim is already handled by {updated.get('handled_by') or 'another officer'}.",
+            "handled_by": updated.get("handled_by"),
+            "handled_by_id": updated.get("handled_by_id"),
+        }
+
+    if actor:
+        log_audit(actor, "claim_reserved", f"Claim {claim_id} handled by {officer_name}", {"handled_by": officer_name, "handled_by_id": officer_id})
+
+    return {
+        "ok": True,
+        "status": "reserved",
+        "message": f"Claim is now handled by {officer_name}.",
+        "handled_by": officer_name,
+        "handled_by_id": officer_id,
+    }
+
+
+def claim_is_locked_for_officer(claim, officer_name=None, officer_id=None):
+    claim = claim or {}
+    current_owner = str(claim.get("handled_by") or "").strip()
+    current_owner_id = str(claim.get("handled_by_id") or "").strip()
+    officer_name = str(officer_name or "").strip()
+    officer_id = str(officer_id or "").strip()
+    if not current_owner and not current_owner_id:
+        return False
+    if officer_name and current_owner == officer_name:
+        return False
+    if officer_id and current_owner_id == officer_id:
+        return False
+    return True
+
+
 def update_status(claim_id, status):
     claim = claims_collection.find_one({"claim_id": claim_id}) or {}
     return record_claim_status_change(

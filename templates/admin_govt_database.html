@@ -53,35 +53,27 @@
         <table class="table">
             <thead>
                 <tr>
-                    <th>Employee ID</th>
+                    <th>Aadhaar</th>
                     <th>Name</th>
-                    <th>Mobile</th>
-                    <th>Email</th>
-                    <th>Department & Designation</th>
-                    <th>Policy Number</th>
-                    <th>Eligibility</th>
+                    <th>Department</th>
                 </tr>
             </thead>
             <tbody>
                 {% for emp in employees %}
                 <tr>
-                    <td style="font-weight: 700; color: var(--primary-color);">{{ emp.employee_id }}</td>
-                    <td><strong>{{ emp.name }}</strong><br><small class="text-muted">{{ emp.gender }}, {{ emp.age }} yrs</small></td>
-                    <td>{{ emp.phone_number }}</td>
-                    <td><small>{{ emp.email }}</small></td>
-                    <td>{{ emp.department }}<br><small class="text-muted">{{ emp.designation }}</small></td>
-                    <td><small class="badge badge-pending" style="background-color: var(--secondary-color); color: white;">{{ emp.policy_number or 'N/A' }}</small></td>
+                    <td style="font-weight: 700; color: var(--primary-color);">
+                        {{ emp.aadhaar_number or emp.identity.aadhaarNumber or emp.identity.aadhaar_number or emp.identity.aadhaarLast4 or emp.identity.aadhaar_last4 or 'N/A' }}
+                    </td>
                     <td>
-                        {% if emp.claim_eligibility %}
-                        <span class="badge badge-approved">Eligible</span>
-                        {% else %}
-                        <span class="badge badge-rejected">Ineligible</span>
-                        {% endif %}
+                        <strong>{{ emp.name or emp.profile.fullName or emp.profile.full_name or 'N/A' }}</strong>
+                    </td>
+                    <td>
+                        {{ emp.department or emp.pension.retiredDepartment or emp.pension.department or 'N/A' }}
                     </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" style="text-align: center; padding: 3rem;" class="text-muted">
+                    <td colspan="3" style="text-align: center; padding: 3rem;" class="text-muted">
                         <i class="fas fa-users" style="font-size: 3rem; margin-bottom: 1rem; color: var(--border-color);"></i>
                         <p>No government employees registered yet. Please upload a CSV to seed records.</p>
                     </td>
@@ -102,9 +94,9 @@
         
         <div style="background-color: var(--bg-alt); padding: 1rem; border-radius: var(--border-radius); border-left: 4px solid var(--warning-color); margin-bottom: 1.5rem; font-size: 0.85rem;">
             <strong>Required Column Headers:</strong><br>
-            <code style="color: var(--danger-color);">aadhaar_number, employee_id, name, phone_number, email, department, designation</code>
+            <code style="color: var(--danger-color);">aadhaar_number, name, department</code>
             <br><br>
-            <strong>Optional Fields:</strong> gender, age, date_of_birth, employee_type, salary, date_of_joining, policy_number, insurance_provider, claim_eligibility, medical_history
+            <strong>Optional Fields:</strong> phone_number, email, designation, gender, age, date_of_birth, employee_type, salary, date_of_joining, policy_number, insurance_provider, claim_eligibility, medical_history
         </div>
 
         <form action="{{ url_for('admin.govt_database_upload') }}" method="POST" enctype="multipart/form-data">

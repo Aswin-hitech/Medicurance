@@ -171,6 +171,96 @@
         </aside>
     </div>
 
+    <div class="section-grid" style="margin-top:1rem;">
+        <section class="hero-panel" style="background: var(--surface-strong);">
+            <div class="section-heading">
+                <div>
+                    <span class="section-kicker">Hospital registry</span>
+                    <h2>NHIS hospital management</h2>
+                </div>
+            </div>
+
+            <div class="card glass-panel" style="margin-top:1rem;">
+                <form method="POST" action="{{ url_for('admin.add_hospital_submit') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+                        <div class="form-group"><label class="form-label">Hospital ID</label><input type="text" name="hospitalId" class="form-control" placeholder="TNNHIS0001" required></div>
+                        <div class="form-group"><label class="form-label">NHIS Code</label><input type="number" name="nhisCode" class="form-control" placeholder="1" required></div>
+                        <div class="form-group"><label class="form-label">Hospital Name</label><input type="text" name="name" class="form-control" placeholder="Hospital name" required></div>
+                        <div class="form-group"><label class="form-label">District</label><input type="text" name="district" class="form-control" placeholder="District" required></div>
+                        <div class="form-group"><label class="form-label">Cluster</label><input type="text" name="cluster" class="form-control" placeholder="Cluster"></div>
+                        <div class="form-group"><label class="form-label">Address</label><input type="text" name="address" class="form-control" placeholder="Street, area, city"></div>
+                        <div class="form-group"><label class="form-label">Pincode</label><input type="text" name="pincode" class="form-control" placeholder="600001"></div>
+                        <div class="form-group"><label class="form-label">Phones</label><input type="text" name="phone" class="form-control" placeholder="9876543210,9876500000"></div>
+                        <div class="form-group"><label class="form-label">Email</label><input type="email" name="email" class="form-control" placeholder="hospital@example.com"></div>
+                        <div class="form-group"><label class="form-label">Longitude</label><input type="text" name="longitude" class="form-control" placeholder="77.1025"></div>
+                        <div class="form-group"><label class="form-label">Latitude</label><input type="text" name="latitude" class="form-control" placeholder="11.0168"></div>
+                        <div class="form-group"><label class="form-label">Specialties</label><input type="text" name="specialties" class="form-control" placeholder="Cardiology, Orthopedics"></div>
+                        <div class="form-group"><label class="form-label">Facilities</label><input type="text" name="facilities" class="form-control" placeholder="ICU, CT Scan, Pharmacy"></div>
+                        <div class="form-group"><label class="form-label">Schemes</label><input type="text" name="schemes" class="form-control" value="TN NHIS 2026"></div>
+                        <div class="form-group"><label class="form-label">OPD Hours</label><input type="text" name="opd" class="form-control" placeholder="09:00 AM - 05:00 PM"></div>
+                    </div>
+                    <div class="toolbar" style="margin-top:0.85rem; gap:1rem; flex-wrap:wrap;">
+                        <label class="chip"><input type="checkbox" name="cashless" checked style="margin-right:0.5rem;"> Cashless</label>
+                        <label class="chip"><input type="checkbox" name="emergency" checked style="margin-right:0.5rem;"> Emergency</label>
+                        <label class="chip"><input type="checkbox" name="status" value="active" checked style="margin-right:0.5rem;"> Active</label>
+                    </div>
+                    <div style="margin-top:1rem;">
+                        <button type="submit" class="btn btn-primary btn-sm">Add hospital</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <aside class="hero-panel" style="background: var(--surface-strong);">
+            <div class="section-heading">
+                <div>
+                    <span class="section-kicker">Hospital records</span>
+                    <h2>Current registry</h2>
+                </div>
+            </div>
+            <div class="table-wrap" style="margin-top:1rem; max-height: 420px; overflow:auto;">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>District</th>
+                            <th>Cashless</th>
+                            <th>Scheme</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for hospital in hospitals %}
+                        <tr>
+                            <td>{{ hospital.hospitalId or hospital.nhisCode or 'N/A' }}</td>
+                            <td><strong>{{ hospital.name }}</strong><br><small class="muted">{{ hospital.cluster or 'No cluster' }}</small></td>
+                            <td>{{ hospital.district }}</td>
+                            <td><span class="badge {% if hospital.cashless %}badge-approved{% else %}badge-rejected{% endif %}">{{ 'YES' if hospital.cashless else 'NO' }}</span></td>
+                            <td>{{ hospital.schemes[0] if hospital.schemes else 'N/A' }}</td>
+                            <td>
+                                <div class="toolbar">
+                                    <form action="{{ url_for('admin.toggle_hospital_network', identifier=hospital.hospitalId or hospital.name) }}" method="POST" style="margin:0;">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-secondary btn-sm">Toggle</button>
+                                    </form>
+                                    <form action="{{ url_for('admin.delete_hospital_route', identifier=hospital.hospitalId or hospital.name) }}" method="POST" style="margin:0;" onsubmit="return confirm('Delete this hospital?')">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-secondary btn-sm">Delete</button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="6" class="text-muted" style="text-align:center; padding:1.5rem;">No hospitals found.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </aside>
+    </div>
+
     <div class="card" style="margin-top:1rem;">
         <div class="section-heading">
             <div>

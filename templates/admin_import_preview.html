@@ -94,11 +94,11 @@
             <thead>
                 <tr>
                     <th style="width: 5%;">Row</th>
-                    <th style="width: 12%;">Employee ID</th>
-                    <th style="width: 18%;">Name</th>
+                    <th style="width: 14%;">Aadhaar</th>
+                    <th style="width: 22%;">Name</th>
                     <th style="width: 15%;">Mobile</th>
                     <th style="width: 15%;">Email</th>
-                    <th style="width: 15%;">Department</th>
+                    <th style="width: 18%;">Department</th>
                     <th style="width: 10%;">Status</th>
                     <th style="width: 25%;">Errors/Notes</th>
                 </tr>
@@ -107,7 +107,7 @@
                 {% for row in preview_rows %}
                 <tr style="background-color: {% if not row.is_valid %}#fff5f5{% endif %};">
                     <td>{{ row.row_num }}</td>
-                    <td style="font-weight: 700;">{{ row.employee_id or 'N/A' }}</td>
+                    <td style="font-weight: 700;">{{ row.aadhaar_number or 'N/A' }}</td>
                     <td><strong>{{ row.name or 'N/A' }}</strong></td>
                     <td>{{ row.phone_number or 'N/A' }}</td>
                     <td><small>{{ row.email or 'N/A' }}</small></td>

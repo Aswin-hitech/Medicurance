@@ -127,7 +127,7 @@ documents_collection = db["documents"]
 hospitals_collection = db["hospitals"]
 otp_collection = db["otp"]
 govt_collection = db["govtlist"]
-officers_collection = db["government_officers"]
+officers_collection = db["govtofficers"]
 admins_collection = db["admins"]
 audit_logs_collection = db["audit_logs"]
 claim_logs_collection = db["claim_logs"]
@@ -135,6 +135,8 @@ notifications_collection = db["notifications"]
 token_revocations_collection = db["token_revocations"]
 claim_versions_collection = db["claim_versions"]
 email_verifications_collection = db["email_verifications"]
+rag_chunks_collection = db["rag_chunks"]
+access_requests_collection = db["access_requests"]
 
 # Advanced Indexing
 if MONGO_AVAILABLE:
@@ -152,17 +154,25 @@ if MONGO_AVAILABLE:
 
     _safe_create_index(hospitals_collection, "name", unique=True)
 
-    _safe_create_index(govt_collection, "phone_number", unique=True)
-    _safe_create_index(govt_collection, "employee_id", unique=True)
-    _safe_create_index(govt_collection, "email", unique=True)
+    _safe_create_index(govt_collection, "phone_number", unique=True, sparse=True)
+    _safe_create_index(govt_collection, "employee_id", unique=True, sparse=True)
+    _safe_create_index(govt_collection, "email", unique=True, sparse=True)
     _safe_create_index(govt_collection, "aadhaar_number", unique=True, sparse=True)
+    # Nested auth fields used by current govtlist schema
+    _safe_create_index(govt_collection, "auth.phone", sparse=True)
+    _safe_create_index(govt_collection, "auth.email", sparse=True)
+    _safe_create_index(govt_collection, "auth.ppoNumber", sparse=True)
 
     _safe_create_index(officers_collection, "officer_id", unique=True)
     _safe_create_index(officers_collection, "employee_id", unique=True, sparse=True)
-    _safe_create_index(officers_collection, "email", unique=True)
-    _safe_create_index(officers_collection, "phone", unique=True)
+    _safe_create_index(officers_collection, "email", unique=True, sparse=True)
+    _safe_create_index(officers_collection, "phone", unique=True, sparse=True)
     _safe_create_index(officers_collection, "phone_number", unique=True, sparse=True)
-    _safe_create_index(officers_collection, "mobile")
+    _safe_create_index(officers_collection, "mobile", sparse=True)
+    _safe_create_index(officers_collection, "aadhaar_number", unique=True, sparse=True)
+    # Nested auth fields used by current govtofficers schema
+    _safe_create_index(officers_collection, "auth.email", sparse=True)
+    _safe_create_index(officers_collection, "auth.phone", sparse=True)
 
     _safe_create_index(admins_collection, "email", unique=True)
     _safe_create_index(audit_logs_collection, "timestamp")
@@ -178,6 +188,11 @@ if MONGO_AVAILABLE:
     _safe_create_index(email_verifications_collection, "token_hash", unique=True)
     _safe_create_index(email_verifications_collection, "email")
     _safe_create_index(email_verifications_collection, "expires_at")
+    _safe_create_index(rag_chunks_collection, "chunk_id", unique=True, sparse=True)
+    _safe_create_index(rag_chunks_collection, "source_url")
+    _safe_create_index(rag_chunks_collection, "document")
+    _safe_create_index(access_requests_collection, "status")
+    _safe_create_index(access_requests_collection, "created_at")
     _safe_create_index(notifications_collection, "claim_id")
     _safe_create_index(notifications_collection, "created_at")
 

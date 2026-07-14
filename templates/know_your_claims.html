@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Know Your Claims | MediCurance{% endblock %}
+
+{% block content %}
+<div class="hero-shell animate-in">
+    <div class="panel-hero">
+        <div>
+            <span class="hero-topline"><i class="fa-solid fa-magnifying-glass"></i> Know Your Claims</span>
+            <h1>See what you can claim</h1>
+            <p class="muted">Find the benefits available to you in simple words. Search by treatment, medicine, hospital, or department.</p>
+        </div>
+        <div class="toolbar">
+            <a href="{{ url_for('user.profile') }}" class="btn btn-secondary btn-sm">Profile</a>
+            <a href="{{ url_for('user.document_center') }}" class="btn btn-secondary btn-sm">Documents</a>
+        </div>
+    </div>
+
+    <div class="card">
+        <form method="GET" action="{{ url_for('user.know_your_claims') }}" class="toolbar">
+            <input type="text" name="q" class="form-control" placeholder="Try: cataract, heart surgery, medicines, surgery bill" value="{{ query }}">
+            <button class="btn btn-primary" type="submit">Search</button>
+        </form>
+    </div>
+
+    <div class="section-grid" style="margin-top:1rem;">
+        {% for item in results %}
+        <div class="card">
+            <h3>{{ item.claim_name }}</h3>
+            <p><strong>What this means:</strong> {{ item.details }}</p>
+            <p><strong>How much may be covered:</strong> {{ item.maximum_reimbursement }}</p>
+            <p><strong>Simple note:</strong> {{ item.eligibility }}</p>
+            <p><strong>What to keep ready:</strong> {{ item.required_documents|join(', ') if item.required_documents else 'Check the annexure for the exact papers' }}</p>
+            <p><strong>Waiting time:</strong> {{ item.waiting_period }}</p>
+            <p><strong>Where it applies:</strong> {{ item.hospital_category }}</p>
+            <p><strong>Annexure reference:</strong> {{ item.annexure_reference }}</p>
+        </div>
+        {% else %}
+        <div class="card">
+            <p class="muted">Type a treatment or health need above to see the claim details in simple language.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

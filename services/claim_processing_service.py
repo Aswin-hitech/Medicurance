@@ -13,37 +13,43 @@ from utils.status_utils import normalize_claim_status
 from utils.logger import log_claim_state, logger
 
 
-class ClaimProcessingError(RuntimeError):
-    """Raised when the claim workflow cannot complete gracefully."""
-
-
 class ClaimProcessingService:
-    def __init__(self, mobile, form_data, uploaded_file):
+    def __init__(self, mobile, form_data, uploaded_files, claim_id=None):
         self.mobile = mobile
         self.form_data = form_data
-        self.uploaded_file = uploaded_file
-        self.temp_path = None
-        self.claim_id = str(uuid.uuid4())
+        self.uploaded_files = uploaded_files if isinstance(uploaded_files, list) else [uploaded_files]
+        self.temp_paths = []
+        self.claim_id = claim_id or str(uuid.uuid4())
         self.context = {}
         self.orchestrator = get_orchestrator_agent()
 
     def validate_upload(self):
-        is_valid, error, sanitized_filename = validate_file_upload(self.uploaded_file)
-        if not is_valid:
-            return False, error
-
         temp_dir = tempfile.gettempdir()
-        self.temp_path = os.path.join(temp_dir, sanitized_filename)
-        self.uploaded_file.save(self.temp_path)
+        for file in self.uploaded_files:
+            is_valid, error, sanitized_filename = validate_file_upload(file)
+            if not is_valid:
+                return False, f"{file.filename}: {error}"
+            t_path = os.path.join(temp_dir, f"{uuid.uuid4().hex}_{sanitized_filename}")
+            file.save(t_path)
+            self.temp_paths.append(t_path)
         return True, None
 
     def upload_document(self):
-        return upload_to_storage(self.temp_path)
+        urls = []
+        for path in self.temp_paths:
+            url = upload_to_storage(path)
+            if url:
+                urls.append(url)
+        return urls
 
     def run_ocr(self):
         from services.ocr_service import extract_text_advanced
-
-        return extract_text_advanced(self.temp_path)
+        full_text = []
+        for path in self.temp_paths:
+            text = extract_text_advanced(path)
+            if text:
+                full_text.append(text)
+        return "\n\n".join(full_text)
 
     def extract_entities(self, text):
         from services.entity_extractor import extract_entities
@@ -51,8 +57,11 @@ class ClaimProcessingService:
 
     def detect_fraud(self, amount, hospital, extracted_text):
         from services.fraud_service import detect_fraud as detect_fraud_engine
-
-        return detect_fraud_engine(self.mobile, amount, hospital, self.temp_path, extracted_text)
+        
+        # Fraud detection currently checks the first image for visual tampering, or we can pass all. 
+        # For now, pass the first image.
+        primary_path = self.temp_paths[0] if self.temp_paths else None
+        return detect_fraud_engine(self.mobile, amount, hospital, primary_path, extracted_text)
 
     def validate_claim(self, hospital, extracted_text, entities):
         from database.hospital_repository import verify_hospital
@@ -124,7 +133,7 @@ class ClaimProcessingService:
             duplicate_result=self.context.get("duplicate_result"),
         )
 
-    def build_memory(self, bill_url: str = "") -> ClaimMemory:
+    def build_memory(self, bill_urls: list = None) -> ClaimMemory:
         amount_value = self.form_data.get("amount", 0)
         try:
             amount = float(amount_value or 0)
@@ -134,6 +143,7 @@ class ClaimProcessingService:
         citizen_remarks_submitted_at = (
             datetime.now(timezone.utc).isoformat() if officer_note else None
         )
+        bill_url = bill_urls[0] if bill_urls else ""
         return ClaimMemory(
             claim_id=self.claim_id,
             mobile=self.mobile,
@@ -141,10 +151,11 @@ class ClaimProcessingService:
             hospital=str(self.form_data.get("hospital", "")).strip(),
             amount=amount,
             bill_url=bill_url,
-            temp_path=self.temp_path or "",
+            temp_path=self.temp_paths[0] if self.temp_paths else "",
             form_data={
                 "officer_note": officer_note,
                 "citizen_remarks_submitted_at": citizen_remarks_submitted_at,
+                "bill_urls": bill_urls or []
             },
         )
 
@@ -157,6 +168,7 @@ class ClaimProcessingService:
             "hospital": payload["hospital"],
             "amount": float(payload["amount"]),
             "bill_url": payload["bill_url"],
+            "bill_urls": payload.get("form_data", {}).get("bill_urls", [payload.get("bill_url")] if payload.get("bill_url") else []),
             "extracted_text": payload["extracted_text"],
             "entities": payload["entities"],
             "image_hash": payload["image_hash"],
@@ -168,7 +180,7 @@ class ClaimProcessingService:
             "rag_result": payload.get("rag_result", {}),
             "officer_note": payload.get("officer_note", ""),
             "citizen_remarks_submitted_at": payload.get("citizen_remarks_submitted_at"),
-            "status": normalize_claim_status(payload.get("status", "Pending")),
+            "status": "Pending",  # Ensure claims always wait for officer review
             "confidence_score": payload.get("confidence_score", 0.0),
             "ocr_confidence": payload.get("ocr_confidence", 0.0),
             "ocr_confidence_score": payload.get("ocr_confidence", 0.0),
@@ -192,8 +204,12 @@ class ClaimProcessingService:
             "retries": payload.get("retries", {}),
             "errors": payload.get("errors", []),
         }
-        claims_collection.insert_one(claim_doc)
-        log_claim_state(self.claim_id, "None", claim_doc["status"], self.mobile, "Claim submitted")
+        claims_collection.update_one(
+            {"claim_id": self.claim_id},
+            {"$set": claim_doc},
+            upsert=True
+        )
+        log_claim_state(self.claim_id, "None", claim_doc["status"], self.mobile, "Claim submitted or updated")
         return claim_doc
 
     def process_claim(self):
@@ -202,8 +218,10 @@ class ClaimProcessingService:
             return {"ok": False, "message": error, "claim_id": self.claim_id}
 
         try:
-            bill_url = self.upload_document() or self.temp_path or ""
-            workflow_memory = self.build_memory(bill_url=bill_url)
+            bill_urls = self.upload_document()
+            if not bill_urls:
+                bill_urls = [p for p in self.temp_paths if p]
+            workflow_memory = self.build_memory(bill_urls=bill_urls)
             result_memory = self.orchestrator.execute(workflow_memory)
             claim_doc = self.persist_claim(result_memory.to_claim_document())
 
@@ -232,8 +250,12 @@ class ClaimProcessingService:
             self.cleanup()
 
     def cleanup(self):
-        if self.temp_path and os.path.exists(self.temp_path):
-            os.remove(self.temp_path)
+        for path in self.temp_paths:
+            if path and os.path.exists(path):
+                try:
+                    os.remove(path)
+                except Exception:
+                    pass
 
 
 def process_claim_job(claim_id):

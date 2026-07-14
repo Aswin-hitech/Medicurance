@@ -22,11 +22,21 @@ def _digit_query_values(value):
 
 
 def _normalize_identifier(value):
-    raw = str(value or "").strip().lower()
+    """Normalise a login identifier for govtofficers lookups.
+
+    - Email  → lowercase
+    - Pure digit string (phone) → digits only
+    - Alphanumeric ID ("GOVOFF009", "OFF009") → kept as-is
+    """
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
     if "@" in raw:
-        return raw
+        return raw.lower()
     digits = _normalize_digits(raw)
-    return digits or raw
+    if digits == raw:      # pure digit string → phone number
+        return digits
+    return raw             # alphanumeric ID, preserve original case
 
 
 def _normalize_officer_payload(officer_data):
@@ -37,6 +47,10 @@ def _normalize_officer_payload(officer_data):
         payload["officer_id"] = str(payload.get("officer_id")).strip()
     if payload.get("employee_id") is not None:
         payload["employee_id"] = str(payload.get("employee_id")).strip()
+    if payload.get("aadhaar_number") is not None:
+        payload["aadhaar_number"] = _normalize_digits(payload.get("aadhaar_number"))
+    if payload.get("aadhaar_last4") is not None:
+        payload["aadhaar_last4"] = _normalize_digits(payload.get("aadhaar_last4"))[-4:]
     if payload.get("email") is not None:
         payload["email"] = str(payload.get("email")).strip().lower()
 
@@ -93,16 +107,27 @@ def _officer_query(identifier):
         return {}
 
     if "@" in normalized:
-        return {"email": normalized}
+        return {
+            "$or": [
+                {"auth.email": normalized},
+                {"email": normalized},
+            ]
+        }
 
     digit_values = _digit_query_values(normalized)
     return {
         "$or": [
+            {"aadhaar_number": normalized},
+            {"aadhaar_last4": normalized[-4:] if len(normalized) >= 4 else normalized},
+            {"identity.aadhaar_number": normalized},
+            {"identity.aadhaarLast4": normalized[-4:] if len(normalized) >= 4 else normalized},
             {"officer_id": normalized},
             {"employee_id": normalized},
             {"phone_number": {"$in": digit_values}},
             {"phone": {"$in": digit_values}},
             {"mobile": {"$in": digit_values}},
+            {"auth.phone": {"$in": digit_values}},
+            {"auth.email": normalized},
         ]
     }
 
@@ -128,13 +153,13 @@ class GovernmentOfficerRepository:
             raise ValueError("Officer identifier is required")
 
         if not payload.get("officer_id"):
-            payload["officer_id"] = payload.get("employee_id") or payload.get("phone_number") or identifier
+            payload["officer_id"] = payload.get("aadhaar_number") or payload.get("employee_id") or payload.get("phone_number") or identifier
         if not payload.get("employee_id"):
             payload["employee_id"] = payload.get("officer_id")
 
         query = _officer_query(identifier)
-        self.db["government_officers"].update_one(query if query else {"officer_id": payload.get("officer_id")}, {"$set": payload}, upsert=True)
-        return self.db["government_officers"].find_one(query if query else {"officer_id": payload.get("officer_id")})
+        self.db["govtofficers"].update_one(query if query else {"officer_id": payload.get("officer_id")}, {"$set": payload}, upsert=True)
+        return self.db["govtofficers"].find_one(query if query else {"officer_id": payload.get("officer_id")})
 
     def create_officer_account(self, officer_data):
         """
@@ -159,17 +184,17 @@ class GovernmentOfficerRepository:
             raise ValueError("Officer identifier is required")
 
         if not payload.get("officer_id"):
-            payload["officer_id"] = payload.get("employee_id") or payload.get("phone_number") or identifier
+            payload["officer_id"] = payload.get("aadhaar_number") or payload.get("employee_id") or payload.get("phone_number") or identifier
         if not payload.get("employee_id"):
             payload["employee_id"] = payload.get("officer_id")
 
         query = _officer_query(identifier)
-        self.db["government_officers"].update_one(
+        self.db["govtofficers"].update_one(
             query if query else {"officer_id": payload.get("officer_id")},
             {"$set": payload},
             upsert=True
         )
-        return self.db["government_officers"].find_one(query if query else {"officer_id": payload.get("officer_id")})
+        return self.db["govtofficers"].find_one(query if query else {"officer_id": payload.get("officer_id")})
 
     def delete_officer(self, officer_id):
         """
@@ -177,10 +202,12 @@ class GovernmentOfficerRepository:
         """
         if not officer_id:
             return None
-        result = self.db["government_officers"].delete_one({
+        result = self.db["govtofficers"].delete_one({
             "$or": [
                 {"officer_id": str(officer_id).strip()},
                 {"employee_id": str(officer_id).strip()},
+                {"aadhaar_number": _normalize_digits(officer_id)},
+                {"identity.aadhaar_number": _normalize_digits(officer_id)},
             ]
         })
         return result.deleted_count
@@ -192,11 +219,15 @@ class GovernmentOfficerRepository:
         if not officer_id:
             return None
         update_data = _normalize_officer_update_data(update_data)
-        result = self.db["government_officers"].update_one(
+        result = self.db["govtofficers"].update_one(
             {
                 "$or": [
                     {"officer_id": str(officer_id).strip()},
                     {"employee_id": str(officer_id).strip()},
+                    {"aadhaar_number": _normalize_digits(officer_id)},
+                    {"aadhaar_last4": _normalize_digits(officer_id)[-4:] if _normalize_digits(officer_id) else ""},
+                    {"identity.aadhaar_number": _normalize_digits(officer_id)},
+                    {"identity.aadhaarLast4": _normalize_digits(officer_id)[-4:] if _normalize_digits(officer_id) else ""},
                 ]
             },
             {"$set": update_data}
@@ -214,11 +245,17 @@ class GovernmentOfficerRepository:
             digit_values = _digit_query_values(query)
             find_query["$or"] = [
                 {"name": search_regex},
+                {"aadhaar_number": search_regex},
+                {"aadhaar_last4": search_regex},
+                {"identity.aadhaar_number": search_regex},
+                {"identity.aadhaarLast4": search_regex},
                 {"officer_id": search_regex},
                 {"employee_id": search_regex},
                 {"designation": search_regex},
                 {"phone": search_regex},
                 {"phone_number": search_regex},
+                {"auth.phone": search_regex},
+                {"auth.email": search_regex},
                 {"email": search_regex}
             ]
             if digit_values:
@@ -234,34 +271,45 @@ class GovernmentOfficerRepository:
         if district:
             find_query["district"] = district
             
-        return list(self.db["government_officers"].find(find_query))
+        return list(self.db["govtofficers"].find(find_query))
 
     def get_all_officers(self):
         """
         Retrieves all government officers.
         """
-        return list(self.db["government_officers"].find())
+        return list(self.db["govtofficers"].find())
 
     def get_officer_by_identifier(self, identifier):
         """
-        Fetch an officer by email, mobile/phone, employee_id, or officer_id.
+        Fetch an officer by auth.email, auth.phone, employee_id, or officer_id
+        from the govtofficers collection.  The schema stores credentials under
+        the nested ``auth`` sub-document.
         """
         normalized = _normalize_identifier(identifier)
         if not normalized:
             return None
 
         if "@" in normalized:
-            return self.db["government_officers"].find_one({"email": normalized})
+            return self.db["govtofficers"].find_one({
+                "$or": [
+                    {"auth.email": normalized},
+                    {"email": normalized},
+                ]
+            })
 
         digit_values = _digit_query_values(normalized)
-        return self.db["government_officers"].find_one(
+        return self.db["govtofficers"].find_one(
             {
                 "$or": [
                     {"employee_id": normalized},
                     {"officer_id": normalized},
+                    {"auth.phone": {"$in": digit_values}},
+                    {"auth.email": normalized},
+                    # Legacy / flat fallbacks
                     {"phone": {"$in": digit_values}},
                     {"mobile": {"$in": digit_values}},
                     {"phone_number": {"$in": digit_values}},
+                    {"email": normalized},
                 ]
             }
         )

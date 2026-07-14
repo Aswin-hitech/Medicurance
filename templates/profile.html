@@ -6,88 +6,137 @@
 <div class="hero-shell animate-in">
     <div class="panel-hero">
         <div>
-            <span class="hero-topline"><i class="fa-solid fa-user"></i> Account profile</span>
-            <h1>{{ employee.get('name') or user.get('name') or mobile }}</h1>
-            <p class="muted">{% if employee.get('employee_id') %}Verified government employee linked to the platform{% else %}Account overview and security details{% endif %}</p>
+            <span class="hero-topline"><i class="fa-solid fa-user"></i> Pensioner profile</span>
+            <h1>{{ profile_data.profile.fullName or user.get('name') or mobile }}</h1>
+            <p class="muted">Complete profile, document status, and claim history in one place.</p>
         </div>
         <div class="toolbar">
-            <span class="badge {% if employee.get('employee_id') %}badge-approved{% else %}badge-pending{% endif %}">{% if employee.get('employee_id') %}Linked{% else %}Unverified{% endif %}</span>
-            <a href="{{ url_for('auth.forgot_password') }}" class="btn btn-secondary btn-sm"><i class="fa-solid fa-key"></i> Reset password</a>
+            <span class="badge badge-approved">Completion {{ profile_data.profileCompletion|default(0) }}%</span>
+            <a href="{{ url_for('user.document_center') }}" class="btn btn-secondary btn-sm">Document Center</a>
+            <a href="{{ url_for('user.know_your_claims') }}" class="btn btn-primary btn-sm">Know Your Claims</a>
         </div>
     </div>
 
     <div class="stats-row">
-        <div class="stat-card">
-            <div class="muted">Role</div>
-            <div class="stat-value" style="font-size:1.35rem;">{{ session.get('role', 'user')|upper }}</div>
-        </div>
-        <div class="stat-card">
-            <div class="muted">Pending</div>
-            <div class="stat-value">{{ pending_count|default(0) }}</div>
-        </div>
-        <div class="stat-card">
-            <div class="muted">Approved</div>
-            <div class="stat-value">{{ approved_count|default(0) }}</div>
-        </div>
-        <div class="stat-card">
-            <div class="muted">Rejected</div>
-            <div class="stat-value">{{ rejected_count|default(0) }}</div>
-        </div>
+        <div class="stat-card"><div class="muted">Pending</div><div class="stat-value">{{ pending_count|default(0) }}</div></div>
+        <div class="stat-card"><div class="muted">Approved</div><div class="stat-value">{{ approved_count|default(0) }}</div></div>
+        <div class="stat-card"><div class="muted">Rejected</div><div class="stat-value">{{ rejected_count|default(0) }}</div></div>
+        <div class="stat-card"><div class="muted">Claims</div><div class="stat-value">{{ profile_data.activity.totalClaims|default(0) }}</div></div>
     </div>
 
     <div class="section-grid" style="margin-top:1rem;">
-        <div class="hero-panel" style="background: var(--surface-strong);">
+        <section class="hero-panel" style="background: var(--surface-strong);">
             <div class="card">
-                <div class="section-heading">
-                    <div>
-                        <span class="section-kicker">Account</span>
-                        <h3>Identity and access</h3>
-                    </div>
-                </div>
-                <p><strong>Mobile:</strong> {{ mobile }}</p>
-                <p><strong>Status:</strong> Active</p>
-                <p><strong>Role:</strong> {{ session.get('role', 'user')|title }}</p>
+                <h3>Basic Information</h3>
+                <p><strong>Name:</strong> {{ profile_data.profile.fullName or 'N/A' }}</p>
+                <p><strong>Gender:</strong> {{ profile_data.profile.gender or 'N/A' }}</p>
+                <p><strong>DOB:</strong> {{ profile_data.profile.dob or 'N/A' }}</p>
+                <p><strong>Age:</strong> {{ profile_data.profile.age or 'N/A' }}</p>
+                <p><strong>PPO Number:</strong> {{ profile_data.auth.ppoNumber or user.get('ppoNumber') or 'Read only' }}</p>
+                <p><strong>Email:</strong> {{ profile_data.auth.email or 'N/A' }}</p>
+                <p><strong>Phone:</strong> {{ profile_data.auth.phone or mobile }}</p>
             </div>
 
             <div class="card">
-                <div class="section-heading">
-                    <div>
-                        <span class="section-kicker">Employment</span>
-                        <h3>Government record</h3>
-                    </div>
-                </div>
-                <p><strong>Employee ID:</strong> {{ employee.get('employee_id') or user.get('employee_id') or 'N/A' }}</p>
-                <p><strong>Department:</strong> {{ employee.get('department') or user.get('department') or 'N/A' }}</p>
-                <p><strong>Designation:</strong> {{ employee.get('designation') or user.get('designation') or 'N/A' }}</p>
-                <p><strong>District:</strong> {{ employee.get('district') or user.get('district') or 'N/A' }}</p>
+                <h3>Address</h3>
+                <p>{{ profile_data.address.doorNo }} {{ profile_data.address.street }}</p>
+                <p>{{ profile_data.address.area }}{% if profile_data.address.village %}, {{ profile_data.address.village }}{% endif %}</p>
+                <p>{{ profile_data.address.taluk }}, {{ profile_data.address.city }}</p>
+                <p>{{ profile_data.address.district }}, {{ profile_data.address.state }} - {{ profile_data.address.pincode }}</p>
             </div>
-        </div>
+
+            <div class="card">
+                <h3>Pension Details</h3>
+                <p><strong>Type:</strong> {{ profile_data.pension.pensionType or 'N/A' }}</p>
+                <p><strong>Department:</strong> {{ profile_data.pension.retiredDepartment or 'N/A' }}</p>
+                <p><strong>Designation:</strong> {{ profile_data.pension.designation or 'N/A' }}</p>
+                <p><strong>Retirement:</strong> {{ profile_data.pension.retirementDate or 'N/A' }}</p>
+                <p><strong>Monthly Pension:</strong> {{ profile_data.pension.monthlyPension or 'N/A' }}</p>
+            </div>
+
+            <div class="card">
+                <h3>Medical Information</h3>
+                <p><strong>Blood group:</strong> {{ profile_data.medical.bloodGroup or 'N/A' }}</p>
+                <p><strong>History:</strong> {{ profile_data.medical.history|join(', ') if profile_data.medical.history else 'N/A' }}</p>
+                <p><strong>Disabilities:</strong> {{ profile_data.medical.disabilities or 'None' }}</p>
+                <p><strong>Allergies:</strong> {{ profile_data.medical.allergies or 'None' }}</p>
+            </div>
+        </section>
 
         <aside class="hero-panel" style="background: var(--surface-strong);">
             <div class="card">
-                <div class="section-heading">
-                    <div>
-                        <span class="section-kicker">Insurance</span>
-                        <h3>Coverage details</h3>
-                    </div>
-                </div>
-                <p><strong>Policy:</strong> {{ employee.get('policy_number') or user.get('policy_number') or 'N/A' }}</p>
-                <p><strong>Provider:</strong> {{ employee.get('insurance_provider') or user.get('insurance_provider') or 'N/A' }}</p>
-                <p><strong>Eligibility:</strong> {{ employee.get('claim_eligibility') or user.get('claim_eligibility') or 'N/A' }}</p>
-                <p><strong>Blood group:</strong> {{ employee.get('blood_group') or user.get('blood_group') or 'N/A' }}</p>
+                <h3>Nominee</h3>
+                <p><strong>Name:</strong> {{ profile_data.nominee.name or 'N/A' }}</p>
+                <p><strong>Relationship:</strong> {{ profile_data.nominee.relationship or 'N/A' }}</p>
+                <p><strong>Phone:</strong> {{ profile_data.nominee.phone or 'N/A' }}</p>
             </div>
-
             <div class="card">
-                <div class="section-heading">
-                    <div>
-                        <span class="section-kicker">Next steps</span>
-                        <h3>Keep your profile current</h3>
-                    </div>
-                </div>
-                <p class="muted">If any employment or insurance detail changes, refresh your records before submitting a new reimbursement request.</p>
-                <a href="{{ url_for('user.dashboard') }}" class="btn btn-primary btn-sm"><i class="fa-solid fa-arrow-left"></i> Back to dashboard</a>
+                <h3>Emergency Contact</h3>
+                <p><strong>Name:</strong> {{ profile_data.emergency.name or 'N/A' }}</p>
+                <p><strong>Relationship:</strong> {{ profile_data.emergency.relationship or 'N/A' }}</p>
+                <p><strong>Phone:</strong> {{ profile_data.emergency.phone or 'N/A' }}</p>
+            </div>
+            <div class="card">
+                <h3>Read-only identifiers</h3>
+                <p><strong>Aadhaar Last 4:</strong> {{ profile_data.identity.aadhaarLast4 or 'N/A' }}</p>
+                <p><strong>PAN Last 4:</strong> {{ profile_data.identity.panLast4 or 'N/A' }}</p>
+                <p><strong>Bank:</strong> {{ profile_data.bank.bankName or 'N/A' }} ({{ profile_data.bank.accountLast4 or 'N/A' }})</p>
+                <p><strong>IFSC:</strong> {{ profile_data.bank.ifsc or 'N/A' }}</p>
+            </div>
+            <div class="card">
+                <h3>Uploaded Documents</h3>
+                <ul>
+                    {% for doc in documents[:8] %}
+                    <li>{{ doc.document_type }} - {{ doc.upload_time or doc.created_at }}</li>
+                    {% else %}
+                    <li class="muted">No documents uploaded yet.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div class="card">
+                <h3>Settings</h3>
+                <p><strong>Language:</strong> {{ profile_data.settings.language or 'English' }}</p>
+                <p><strong>Notifications:</strong> {{ 'Enabled' if profile_data.settings.notifications else 'Disabled' }}</p>
+                <p><strong>Theme:</strong> {{ profile_data.settings.theme or 'light' }}</p>
+            </div>
+            <div class="card">
+                <h3>Claim History</h3>
+                {% if claims %}
+                <p><strong>Total:</strong> {{ claims|length }}</p>
+                {% for claim in claims[:3] %}
+                <p>#{{ claim.claim_id[-8:] }} - {{ claim.status }}</p>
+                {% endfor %}
+                {% else %}
+                <p class="muted">No claims yet.</p>
+                {% endif %}
             </div>
         </aside>
+    </div>
+
+    <div class="card" style="margin-top:1rem;">
+        <form action="{{ url_for('user.update_profile') }}" method="POST" class="section-grid">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div>
+                <h3>Edit Allowed Fields</h3>
+                <div class="form-group"><label class="form-label">Email</label><input class="form-control" type="email" name="email" value="{{ profile_data.auth.email }}"></div>
+                <div class="form-group"><label class="form-label">Phone</label><input class="form-control" type="text" name="phone" value="{{ profile_data.auth.phone }}"></div>
+                <div class="form-group"><label class="form-label">Emergency Name</label><input class="form-control" type="text" name="emergencyName" value="{{ profile_data.emergency.name }}"></div>
+                <div class="form-group"><label class="form-label">Emergency Relationship</label><input class="form-control" type="text" name="emergencyRelationship" value="{{ profile_data.emergency.relationship }}"></div>
+                <div class="form-group"><label class="form-label">Emergency Phone</label><input class="form-control" type="text" name="emergencyPhone" value="{{ profile_data.emergency.phone }}"></div>
+            </div>
+            <div>
+                <h3>Address and Medical</h3>
+                <div class="form-group"><label class="form-label">Door No</label><input class="form-control" type="text" name="doorNo" value="{{ profile_data.address.doorNo }}"></div>
+                <div class="form-group"><label class="form-label">Street</label><input class="form-control" type="text" name="street" value="{{ profile_data.address.street }}"></div>
+                <div class="form-group"><label class="form-label">Area</label><input class="form-control" type="text" name="area" value="{{ profile_data.address.area }}"></div>
+                <div class="form-group"><label class="form-label">Medical History</label><input class="form-control" type="text" name="medicalHistory" value="{{ profile_data.medical.history|join(', ') if profile_data.medical.history else '' }}"></div>
+                <div class="form-group"><label class="form-label">Language</label><input class="form-control" type="text" name="language" value="{{ profile_data.settings.language }}"></div>
+                <div class="form-group"><label class="form-label">Theme</label><input class="form-control" type="text" name="theme" value="{{ profile_data.settings.theme }}"></div>
+            </div>
+            <div style="grid-column:1 / -1;">
+                <button class="btn btn-primary" type="submit">Save changes</button>
+            </div>
+        </form>
     </div>
 </div>
 {% endblock %}

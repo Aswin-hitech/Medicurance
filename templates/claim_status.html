@@ -54,10 +54,21 @@
             </div>
 
             <div class="toolbar" style="margin-top:1rem; justify-content:flex-start;">
-                <a href="{{ claim.bill_url }}" target="_blank" class="btn btn-secondary btn-sm"><i class="fa-solid fa-file-arrow-up"></i> Bill</a>
-                {% if claim.status != 'Pending' %}
+                {% if claim.bill_urls %}
+                    {% for url in claim.bill_urls %}
+                        <a href="{{ url }}" target="_blank" class="btn btn-secondary btn-sm"><i class="fa-solid fa-file"></i> Document {{ loop.index }}</a>
+                    {% endfor %}
+                {% elif claim.bill_url %}
+                    <a href="{{ claim.bill_url }}" target="_blank" class="btn btn-secondary btn-sm"><i class="fa-solid fa-file"></i> Document</a>
+                {% endif %}
+                
+                {% if claim.status != 'Pending' and claim.status != 'Hold' %}
                     <a href="{{ url_for('user.generate_letter', claim_id=claim.claim_id, letter_type='officer_to_beneficiary') }}" target="_blank" class="btn btn-secondary btn-sm"><i class="fa-solid fa-eye"></i> View letter</a>
                     <a href="{{ url_for('user.download_letter', claim_id=claim.claim_id) }}" class="btn btn-primary btn-sm"><i class="fa-solid fa-file-pdf"></i> Download</a>
+                {% endif %}
+                
+                {% if claim.status == 'Hold' %}
+                    <a href="{{ url_for('user.edit_claim', claim_id=claim.claim_id) }}" class="btn btn-warning btn-sm"><i class="fa-solid fa-pen-to-square"></i> Edit Claim</a>
                 {% endif %}
             </div>
         </article>

@@ -86,7 +86,10 @@ a {
 }
 
 a:hover {
-    color: var(--primary-strong);
+    color: #ffffff;
+    text-shadow:
+        0 0 8px rgba(88, 166, 255, 0.62),
+        0 0 18px rgba(68, 215, 200, 0.30);
 }
 
 img, video {

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Request Access | MediCurance{% endblock %}
+
+{% block content %}
+<div class="hero-shell animate-in" style="max-width: 920px; margin: 0 auto;">
+    <div class="panel-hero">
+        <div>
+            <span class="hero-topline"><i class="fa-solid fa-user-plus"></i> Request Access</span>
+            <h1>Submit your details for admin review</h1>
+            <p class="muted">If you are not already in the database, send the required details here and an admin can add the record securely.</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <form action="{{ url_for('auth.request_access_submit') }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+                <div class="form-group">
+                    <label class="form-label">Requested Role</label>
+                    <select name="requested_role" class="form-control" required>
+                        <option value="user">Beneficiary</option>
+                        <option value="officer">Government Officer</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Full Name</label>
+                    <input type="text" name="full_name" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" name="email" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Phone Number</label>
+                    <input type="text" name="phone" class="form-control" pattern="[0-9]{10}" maxlength="10" placeholder="10-digit mobile number">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">PPO Number</label>
+                    <input type="text" name="ppo_number" class="form-control" placeholder="Pensioner PPO number">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Officer ID</label>
+                    <input type="text" name="officer_id" class="form-control" placeholder="Officer identifier">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Aadhaar Number</label>
+                    <input type="text" name="aadhaar_number" class="form-control" maxlength="12" pattern="[0-9]{12}" placeholder="12-digit Aadhaar">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Department</label>
+                    <input type="text" name="department" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Designation</label>
+                    <input type="text" name="designation" class="form-control">
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Send Request</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

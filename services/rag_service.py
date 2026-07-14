@@ -9,14 +9,17 @@ import logging
 import math
 import pickle
 import re
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from importlib.util import find_spec
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
 from config.settings import Config
+from database.mongo_client import rag_chunks_collection
 from utils.cache import ttl_cache
 from services.llm_service import ask_llm
+from services.supabase_db_service import bulk_upsert_annexure_chunks
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +34,9 @@ class RuleChunk:
     source_document: str
     page: int
     chunk_id: str
+    source_url: str | None = None
+    section: str | None = None
+    category: str | None = None
 
 
 def _vector_dir() -> Path:
@@ -38,10 +44,25 @@ def _vector_dir() -> Path:
 
 
 def _pdf_paths() -> List[Path]:
-    return [
+    paths = [
         Path(Config.ANNEXURE_PATH),
-        Path(getattr(Config, "ANNEXURE_IA_PATH", "resources/annexures/annexure_IA.pdf")),
     ]
+    annexure_ia_raw = str(getattr(Config, "ANNEXURE_IA_PATH", "") or "").strip()
+    annexure_ia = Path(annexure_ia_raw) if annexure_ia_raw else None
+    if annexure_ia and annexure_ia.is_file():
+        paths.append(annexure_ia)
+    for folder in (Path("resources/annexures"), Path("resources/knowledge_base"), Path("resources/rag")):
+        if folder.exists():
+            paths.extend(sorted(folder.glob("*.pdf")))
+    unique = []
+    seen = set()
+    for path in paths:
+        key = str(path.resolve()) if path.exists() else str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(path)
+    return unique
 
 
 def _dependencies_available() -> bool:
@@ -121,6 +142,21 @@ def _load_chunks_from_pdfs() -> List[RuleChunk]:
     return chunks
 
 
+def _load_existing_vector_payload():
+    if not vector_store_exists():
+        return None, []
+    try:
+        import faiss
+
+        index = faiss.read_index(str(_index_path()))
+        with _metadata_path().open("rb") as handle:
+            chunks = pickle.load(handle)
+        return index, chunks
+    except Exception as exc:
+        logger.warning("[RAG] Existing vector payload load failed: %s", exc)
+        return None, []
+
+
 def _embedding_model():
     from sentence_transformers import SentenceTransformer
 
@@ -149,7 +185,7 @@ def vector_store_exists() -> bool:
 
 
 def build_vector_db() -> bool:
-    """Build a FAISS vector database from annexure_I.pdf and annexure_IA.pdf."""
+    """Build a FAISS vector database from the available annexure PDFs."""
     if not _dependencies_available():
         return False
 
@@ -164,6 +200,8 @@ def build_vector_db() -> bool:
         model = _embedding_model()
         vectors = model.encode([chunk.text for chunk in chunks], show_progress_bar=False)
         vectors = _normalise_vectors(vectors)
+        for chunk, vector in zip(chunks, vectors):
+            setattr(chunk, "embedding", [float(value) for value in vector.tolist()])
 
         index = faiss.IndexFlatIP(vectors.shape[1])
         index.add(vectors)
@@ -174,11 +212,114 @@ def build_vector_db() -> bool:
         with _metadata_path().open("wb") as handle:
             pickle.dump(chunks, handle)
 
+        supabase_rows = []
+        for idx, chunk in enumerate(chunks, start=1):
+            supabase_rows.append({
+                "file_name": chunk.source_document,
+                "file_path": chunk.source_document,
+                "chunk_index": idx,
+                "content": chunk.text,
+                "metadata": {
+                    "source_document": chunk.source_document,
+                    "page": chunk.page,
+                    "chunk_id": chunk.chunk_id,
+                    "source_url": None,
+                    "section": None,
+                    "category": "Annexure",
+                },
+                "embedding": getattr(chunk, "embedding", []),
+            })
+        bulk_upsert_annexure_chunks(supabase_rows)
+
         logger.info("[RAG] Built FAISS vector DB at %s with %s chunks.", vector_dir, len(chunks))
         return True
     except Exception as exc:
         logger.warning("[RAG] Vector DB build failed: %s", exc)
         return False
+
+
+def append_chunks_to_vector_db(chunks: List[Dict[str, Any]]) -> bool:
+    if not chunks:
+        return False
+    if not _dependencies_available():
+        return False
+    try:
+        import faiss
+
+        existing_index, existing_chunks = _load_existing_vector_payload()
+        model = _embedding_model()
+        payload_chunks = []
+        for item in chunks:
+            payload_chunks.append(RuleChunk(
+                text=str(item.get("text", "")).strip(),
+                source_document=str(item.get("source_document") or item.get("document") or "NHIS").strip(),
+                page=int(item.get("page") or 1),
+                chunk_id=str(item.get("chunk_id")),
+                source_url=str(item.get("source_url") or "") or None,
+                section=str(item.get("section") or "") or None,
+                category=str(item.get("category") or "") or None,
+            ))
+
+        payload_chunks = [chunk for chunk in payload_chunks if chunk.text and chunk.chunk_id]
+        if not payload_chunks:
+            return False
+
+        vectors = model.encode([chunk.text for chunk in payload_chunks], show_progress_bar=False)
+        vectors = _normalise_vectors(vectors)
+
+        if existing_index is None or not existing_chunks:
+            index = faiss.IndexFlatIP(vectors.shape[1])
+            merged_chunks = payload_chunks
+        else:
+            index = existing_index
+            merged_chunks = existing_chunks + payload_chunks
+
+        index.add(vectors)
+        vector_dir = _vector_dir()
+        vector_dir.mkdir(parents=True, exist_ok=True)
+        faiss.write_index(index, str(_index_path()))
+        with _metadata_path().open("wb") as handle:
+            pickle.dump(merged_chunks, handle)
+        logger.info("[RAG] Appended %s chunks to vector DB.", len(payload_chunks))
+        return True
+    except Exception as exc:
+        logger.warning("[RAG] Append to vector DB failed: %s", exc)
+        return False
+
+
+def save_rag_chunks_to_mongo(chunks: List[Dict[str, Any]]) -> int:
+    inserted = 0
+    now = datetime.now(timezone.utc).isoformat()
+    for item in chunks:
+        payload = dict(item)
+        payload.setdefault("created_at", now)
+        payload["updated_at"] = now
+        if not payload.get("chunk_id"):
+            continue
+        rag_chunks_collection.update_one({"chunk_id": payload["chunk_id"]}, {"$set": payload}, upsert=True)
+        inserted += 1
+    return inserted
+
+
+def save_rag_chunks_to_supabase(chunks: List[Dict[str, Any]], file_name: str = "TNPolInfo") -> int:
+    rows = []
+    for idx, item in enumerate(chunks, start=1):
+        rows.append({
+            "file_name": item.get("source_document") or file_name,
+            "file_path": item.get("source_url") or file_name,
+            "chunk_index": int(idx),
+            "content": item.get("text", ""),
+            "metadata": {
+                "source_document": item.get("source_document"),
+                "source_url": item.get("source_url"),
+                "page": item.get("page"),
+                "section": item.get("section"),
+                "category": item.get("category"),
+                "chunk_id": item.get("chunk_id"),
+            },
+            "embedding": "[" + ",".join(str(float(v)) for v in item.get("embedding", [])) + "]",
+        })
+    return bulk_upsert_annexure_chunks(rows)
 
 
 def _load_vector_store():
@@ -266,6 +407,10 @@ DEFAULTS = {
     "missing_documents": [],
     "amount_analysis": {"claimed": 0, "expected_range": "N/A", "status": "anomalous"},
     "source_references": [],
+    "status": "Pending Review",
+    "source_document": "Annexure I / Annexure IA",
+    "matched_rule": "Rule retrieval is pending for this claim.",
+    "llm_explanation": "Government rule retrieval is pending because the vector index is not ready yet.",
 }
 
 
@@ -343,9 +488,9 @@ def rag_validate(bill_text: str, entities: dict | None = None) -> dict:
             **DEFAULTS,
             "eligibility": "Unknown",
             "confidence": 0.0,
-            "reason": "RAG unavailable",
-            "reasoning": "RAG unavailable",
-            "fraud_flags": ["RAG unavailable"],
+            "reason": "Rule retrieval pending",
+            "reasoning": "Government rule retrieval is pending because the vector index is not ready yet.",
+            "fraud_flags": ["Rule retrieval pending"],
         })
 
     context = "\n\n".join(
@@ -373,6 +518,8 @@ def rag_validate(bill_text: str, entities: dict | None = None) -> dict:
 
     prompt = f"""You are an AI system auditing government medical reimbursement claims in India.
 Validate the medical bill strictly against the government scheme rules provided.
+
+CRITICAL INSTRUCTION: If even ONE chunk of the provided rules matches the procedure, condition, or hospital, you MUST mark the claim as "Eligible". Do not require all rules to match. A single strong match is sufficient for eligibility.
 
 GOVERNMENT SCHEME RULES:
 {context}

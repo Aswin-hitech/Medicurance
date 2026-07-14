@@ -1,39 +1,45 @@
 {% extends "base.html" %}
 
-{% block title %}Submit Claim | MediCurance{% endblock %}
+{% block title %}Edit Claim | MediCurance{% endblock %}
 
 {% block content %}
 <div class="hero-shell animate-in">
     <div class="panel-hero" style="margin-bottom:1rem;">
         <div>
-            <span class="hero-topline"><i class="fa-solid fa-file-circle-plus"></i> Claim intake</span>
-            <h1 style="margin-top:1rem;">Submit a reimbursement request</h1>
-            <p class="muted">Upload a bill, preview the file, and add officer notes in one streamlined flow.</p>
+            <span class="hero-topline"><i class="fa-solid fa-file-pen"></i> Edit Claim</span>
+            <h1 style="margin-top:1rem;">Update your reimbursement request</h1>
+            <p class="muted">Your claim was placed on hold. Please review the officer's notes and provide the requested corrections or missing documents.</p>
         </div>
-        <div class="metric-ring" style="--percent: 72%;">
-            <span>3 steps</span>
+        <div class="metric-ring" style="--percent: 50%;">
+            <span>Action Required</span>
         </div>
     </div>
 
     <div class="hero-grid" style="grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.7fr);">
         <section class="hero-panel" style="background: var(--surface-strong);">
-            <form action="{{ url_for('user.submit_claim') }}" method="POST" enctype="multipart/form-data" id="claimForm">
+            {% if claim.hold_reason %}
+            <div class="card" style="margin-bottom:1rem; border-left:4px solid var(--warning); background:var(--bg-elevated);">
+                <h3 style="color:var(--warning); margin-bottom:0.5rem;"><i class="fa-solid fa-triangle-exclamation"></i> Officer's Note</h3>
+                <p>{{ claim.hold_reason }}</p>
+            </div>
+            {% endif %}
+            <form action="{{ url_for('user.edit_claim', claim_id=claim.claim_id) }}" method="POST" enctype="multipart/form-data" id="claimForm">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));">
                     <div class="form-group">
                         <label class="form-label">Patient name</label>
-                        <input type="text" name="name" class="form-control" placeholder="Full name" required>
+                        <input type="text" name="name" class="form-control" placeholder="Full name" value="{{ claim.name }}" required>
                     </div>
                     <div class="form-group">
                         <label class="form-label">Claim amount</label>
-                        <input type="number" name="amount" class="form-control" placeholder="25000" min="1" step="0.01" required>
+                        <input type="number" name="amount" class="form-control" placeholder="25000" min="1" step="0.01" value="{{ claim.amount }}" required>
                     </div>
                 </div>
 
                 <div class="form-group">
                     <label class="form-label">Hospital</label>
-                    <select name="hospital" id="hospital-dropdown" class="form-control" required>
-                        <option value="">Loading hospitals...</option>
+                    <select name="hospital" id="hospital-dropdown" class="form-control" data-selected="{{ claim.hospital }}" required>
+                        <option value="{{ claim.hospital }}" selected>{{ claim.hospital }}</option>
                     </select>
                 </div>
 
@@ -42,18 +48,18 @@
                     <textarea
                         name="officer_note"
                         class="form-control"
-                        rows="8"
-                        placeholder="Add any supporting explanation, urgency, or clarification for the officer."></textarea>
+                        rows="4"
+                        placeholder="Add any supporting explanation, urgency, or clarification for the officer.">{{ claim.officer_note }}</textarea>
                 </div>
 
                 <div class="form-group">
                     <label class="form-label">Medical bill</label>
                     <div id="uploadZone" class="upload-dropzone">
                         <div class="upload-copy">
-                            <strong>Drag and drop your document here</strong>
-                            <span class="muted">PDF, JPG, JPEG, or PNG. Preview updates instantly.</span>
+                            <strong>Drag and drop new or missing documents here</strong>
+                            <span class="muted">Upload additional PDFs or images. Leave blank if no new documents are required.</span>
                         </div>
-                        <input type="file" name="bills" id="billInput" class="form-control" accept=".pdf,.jpg,.jpeg,.png" required multiple style="margin-top:1rem;">
+                        <input type="file" name="bills" id="billInput" class="form-control" accept=".pdf,.jpg,.jpeg,.png" multiple style="margin-top:1rem;">
                         <div class="skeleton" style="margin-top:0.9rem; height:10px; border-radius:999px;">
                             <div id="uploadProgress" style="width:0%; height:100%; border-radius:999px; background:linear-gradient(135deg, var(--primary), var(--accent)); transition:width 0.2s ease;"></div>
                         </div>
@@ -61,8 +67,8 @@
                 </div>
 
                 <div class="toolbar">
-                    <a href="{{ url_for('user.dashboard') }}" class="btn btn-secondary">Cancel</a>
-                    <button type="submit" class="btn btn-primary">Submit claim</button>
+                    <a href="{{ url_for('user.claim_status') }}" class="btn btn-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary">Save changes & resubmit</button>
                 </div>
             </form>
         </section>

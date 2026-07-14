@@ -7,8 +7,8 @@
     <div class="hero-grid">
         <section class="hero-panel">
             <span class="hero-topline"><i class="fa-solid fa-shield-heart"></i> Secure access</span>
-            <h1 style="margin-top:1rem;">Sign in to the enterprise claims platform</h1>
-            <p class="muted" style="max-width: 56ch;">Access beneficiary services, officer review workspaces, and admin intelligence dashboards from one trusted portal.</p>
+            <h1 style="margin-top:1rem;">Sign in to the claims portal</h1>
+            <p class="muted" style="max-width: 56ch;">Beneficiaries sign in with mobile number and PPO number. Officers sign in with mobile number and officer ID. Admins use email and password.</p>
 
             <div class="insight-grid" style="margin-top:1.25rem;">
                 <div class="insight-card">
@@ -19,7 +19,7 @@
                 <div class="insight-card">
                     <div class="muted">Experience</div>
                     <h3>Fast onboarding</h3>
-                    <p class="muted">Choose password or OTP, depending on your role.</p>
+                    <p class="muted">Use the details linked to your record.</p>
                 </div>
                 <div class="insight-card">
                     <div class="muted">Trust</div>
@@ -33,7 +33,7 @@
             <div class="card-header">
                 <div class="chip"><i class="fa-solid fa-right-to-bracket"></i> Login</div>
                 <h2 style="margin-top:0.75rem;">Welcome back</h2>
-                <p class="muted">Use your role-specific sign-in method.</p>
+                <p class="muted">Please choose your role and enter the details from your record.</p>
             </div>
 
             <div class="segmented" style="margin-bottom:1rem;">
@@ -54,25 +54,33 @@
                 <form action="{{ url_for('auth.login_submit') }}" method="POST" id="passwordLoginForm">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <input type="hidden" name="role" id="formRole" value="user">
+                    <input type="hidden" name="login_mode" id="loginModePassword" value="password">
                     <div class="form-group" id="identifierGroup">
-                        <label class="form-label" id="identifierLabel">Mobile Number or Email</label>
-                        <input type="text" name="mobile" id="identifierInput" class="form-control" placeholder="Enter your mobile number or email" required>
+                        <label class="form-label" id="identifierLabel">Email or Mobile Number <span class="text-danger">*</span></label>
+                        <input type="text" name="identifier" id="identifierInput" class="form-control" placeholder="Enter email or mobile number" required>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Password</label>
+                    <div class="form-group" id="passwordGroup">
+                        <label class="form-label">Password <span class="text-danger">*</span></label>
                         <input type="password" name="password" class="form-control" placeholder="Enter your password" required>
+                        <small class="muted" id="passwordHint">Only needed for admin sign-in.</small>
                     </div>
-                    <button type="submit" class="btn btn-primary w-100" id="passwordSubmitBtn">Login with password</button>
+                    <button type="submit" class="btn btn-primary w-100" id="passwordSubmitBtn">Continue</button>
                 </form>
             </div>
 
             <div id="otpLoginSection" style="display:none;">
                 <form action="{{ url_for('auth.send_otp_route') }}" method="POST" id="otpLoginForm">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="login_mode" value="otp">
                     <div class="form-group">
-                        <label class="form-label">Mobile Number</label>
-                        <input type="text" name="mobile" class="form-control" placeholder="10-digit mobile number" required pattern="[0-9]{10}" maxlength="10">
+                        <label class="form-label" id="otpIdentifierLabel">PPO Number <span class="text-danger">*</span></label>
+                        <input type="text" name="ppo_number" id="otpIdentifierInput" class="form-control" placeholder="Enter PPO number" required>
                     </div>
+                    <div class="form-group" id="mobileOtpGroup" style="display:block;">
+                        <label class="form-label" id="mobileOtpLabel">Mobile Number <span class="text-danger">*</span></label>
+                        <input type="tel" name="mobile_number" id="mobileOtpInput" class="form-control" placeholder="Enter mobile number" pattern="[0-9]{10}" title="Enter 10 digit mobile number" required>
+                    </div>
+
                     <button type="submit" class="btn btn-primary w-100">Send OTP</button>
                 </form>
             </div>
@@ -80,7 +88,7 @@
             <div class="card" style="margin-top:1rem; margin-bottom:0; background: var(--bg-elevated);">
                 <div class="toolbar">
                     <a href="{{ url_for('auth.forgot_password') }}" class="muted"><i class="fa-solid fa-key"></i> Forgot password?</a>
-                    <a href="{{ url_for('auth.register_page') }}" class="muted"><i class="fa-solid fa-user-plus"></i> New account</a>
+                    <a href="{{ url_for('auth.request_access_page') }}" class="muted"><i class="fa-solid fa-user-plus"></i> Request access</a>
                 </div>
             </div>
         </section>
@@ -95,6 +103,11 @@
         const otpSec = document.getElementById('otpLoginSection');
         const pwdBtn = document.getElementById('tabPasswordBtn');
         const otpBtn = document.getElementById('tabOtpBtn');
+        const passwordGroup = document.getElementById('passwordGroup');
+        const passwordHint = document.getElementById('passwordHint');
+        const passwordInput = passwordGroup ? passwordGroup.querySelector('input[name="password"]') : null;
+        const otpIdentifierLabel = document.getElementById('otpIdentifierLabel');
+        const otpIdentifierInput = document.getElementById('otpIdentifierInput');
 
         if (type === 'password') {
             pwdSec.style.display = 'block';
@@ -106,6 +119,11 @@
             otpSec.style.display = 'block';
             pwdBtn.className = 'btn btn-secondary btn-sm';
             otpBtn.className = 'btn btn-primary btn-sm';
+            if (otpIdentifierLabel && otpIdentifierInput) {
+                otpIdentifierLabel.innerHTML = document.getElementById('loginRole').value === 'officer' ? 'Officer ID <span class="text-danger">*</span>' : 'PPO Number <span class="text-danger">*</span>';
+                otpIdentifierInput.placeholder = document.getElementById('loginRole').value === 'officer' ? 'Enter officer ID' : 'Enter PPO number';
+                otpIdentifierInput.name = document.getElementById('loginRole').value === 'officer' ? 'officer_id' : 'ppo_number';
+            }
         }
     }
 
@@ -116,25 +134,62 @@
         const identifierLabel = document.getElementById('identifierLabel');
         const identifierInput = document.getElementById('identifierInput');
         const passwordSubmitBtn = document.getElementById('passwordSubmitBtn');
+        const passwordGroup = document.getElementById('passwordGroup');
+        const passwordHint = document.getElementById('passwordHint');
+        const passwordInput = passwordGroup ? passwordGroup.querySelector('input[name="password"]') : null;
+        const otpIdentifierLabel = document.getElementById('otpIdentifierLabel');
+        const otpIdentifierInput = document.getElementById('otpIdentifierInput');
 
         formRole.value = role;
 
         if (role === 'admin') {
             tabOtpBtn.style.display = 'none';
             toggleLogin('password');
-            identifierLabel.textContent = 'Admin Email Address';
+            identifierLabel.innerHTML = 'Admin Email Address <span class="text-danger">*</span>';
             identifierInput.type = 'email';
             identifierInput.name = 'email';
             identifierInput.placeholder = 'admin@medicurance.gov.in';
             passwordSubmitBtn.textContent = 'Login as admin';
-        } else {
+            if (passwordGroup) passwordGroup.style.display = 'block';
+            if (passwordHint) passwordHint.textContent = 'Enter your admin password.';
+            if (passwordHint) passwordHint.style.display = 'block';
+            if (passwordInput) passwordInput.required = true;
+        } else if (role === 'officer') {
             tabOtpBtn.style.display = 'inline-flex';
-            identifierLabel.textContent = 'Mobile Number or Email';
+            identifierLabel.innerHTML = 'Email or Mobile Number <span class="text-danger">*</span>';
             identifierInput.type = 'text';
-            identifierInput.name = 'mobile';
-            identifierInput.placeholder = 'Enter your mobile number or email';
-            passwordSubmitBtn.textContent = role === 'officer' ? 'Login as officer' : 'Login with password';
+            identifierInput.name = 'identifier';
+            identifierInput.placeholder = 'Enter email or mobile number';
+            passwordSubmitBtn.textContent = 'Login as officer';
+            if (passwordGroup) passwordGroup.style.display = 'block';
+            if (passwordHint) passwordHint.textContent = 'Enter your officer password.';
+            if (passwordHint) passwordHint.style.display = 'block';
+            if (passwordInput) passwordInput.required = true;
+            if (otpIdentifierLabel && otpIdentifierInput) {
+                otpIdentifierLabel.innerHTML = 'Employee ID <span class="text-danger">*</span>';
+                otpIdentifierInput.name = 'officer_id';
+                otpIdentifierInput.placeholder = 'Enter employee ID';
+            }
+        } else {
+            // Beneficiary: Email/Mobile + Password for password login; Mobile + PPO for OTP
+            tabOtpBtn.style.display = 'inline-flex';
+            identifierLabel.innerHTML = 'Email or Mobile Number <span class="text-danger">*</span>';
+            identifierInput.type = 'text';
+            identifierInput.name = 'identifier';
+            identifierInput.placeholder = 'Enter email or mobile number';
+            passwordSubmitBtn.textContent = 'Login as beneficiary';
+            if (passwordGroup) passwordGroup.style.display = 'block';
+            if (passwordHint) passwordHint.textContent = 'Enter your beneficiary account password.';
+            if (passwordHint) passwordHint.style.display = 'block';
+            if (passwordInput) passwordInput.required = true;
+            if (otpIdentifierLabel && otpIdentifierInput) {
+                otpIdentifierLabel.innerHTML = 'PPO Number <span class="text-danger">*</span>';
+                otpIdentifierInput.name = 'ppo_number';
+                otpIdentifierInput.placeholder = 'Enter PPO number';
+            }
         }
     }
+
+    handleRoleChange();
 </script>
 {% endblock %}

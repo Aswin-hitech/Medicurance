@@ -116,8 +116,11 @@ def _startup_health_report():
     vector_path = Path(Config.VECTOR_DB_PATH)
     annexure_paths = [
         Path(Config.ANNEXURE_PATH),
-        Path(getattr(Config, "ANNEXURE_IA_PATH", "resources/annexures/annexure_IA.pdf")),
     ]
+    annexure_ia_raw = str(getattr(Config, "ANNEXURE_IA_PATH", "") or "").strip()
+    annexure_ia_path = Path(annexure_ia_raw) if annexure_ia_raw else None
+    if annexure_ia_path and annexure_ia_path.is_file():
+        annexure_paths.append(annexure_ia_path)
     try:
         from services.vector_store_manager import validate_vector_store
 

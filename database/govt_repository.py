@@ -43,6 +43,31 @@ def _normalize_date(value):
     return raw
 
 
+def _first_present(document, *paths):
+    current = document or {}
+    for path in paths:
+        node = current
+        found = True
+        for key in str(path).split("."):
+            if not isinstance(node, dict) or key not in node:
+                found = False
+                break
+            node = node.get(key)
+        if found and node not in (None, ""):
+            return node
+    return ""
+
+
+def _nested_query(*values, field_paths):
+    clauses = []
+    for value in values:
+        if value in (None, ""):
+            continue
+        for path in field_paths:
+            clauses.append({path: value})
+    return clauses
+
+
 class GovtRepository:
     def __init__(self, db):
         self.db = db
@@ -53,13 +78,17 @@ class GovtRepository:
         """
         employee_data.pop('_id', None)
 
-        aadhaar_number = _normalize_aadhaar(employee_data.get("aadhaar_number"))
+        aadhaar_number = _normalize_aadhaar(employee_data.get("aadhaar_number") or _first_present(employee_data, "identity.aadhaarNumber", "identity.aadhaar_number"))
         if not aadhaar_number:
             raise ValueError("aadhaar_number is required")
 
+        employee_data.setdefault("identity", {})
+        employee_data["identity"]["aadhaarNumber"] = aadhaar_number
+        employee_data["identity"]["aadhaar_number"] = aadhaar_number
+        employee_data["identity"]["aadhaarLast4"] = aadhaar_number[-4:]
+        employee_data["identity"]["aadhaar_last4"] = aadhaar_number[-4:]
         employee_data["aadhaar_number"] = aadhaar_number
-        if not employee_data.get("aadhaar_last4"):
-            employee_data["aadhaar_last4"] = aadhaar_number[-4:]
+        employee_data["aadhaar_last4"] = aadhaar_number[-4:]
 
         now = datetime.now(timezone.utc).isoformat()
         employee_data.setdefault("created_at", now)
@@ -80,6 +109,8 @@ class GovtRepository:
             return None
         return self.db["govtlist"].find_one({
             "$or": [
+                {"auth.phone": {"$in": query_values}},
+                {"auth.phone_number": {"$in": query_values}},
                 {"mobile": {"$in": query_values}},
                 {"phone": {"$in": query_values}},
                 {"phone_number": {"$in": query_values}},
@@ -92,7 +123,26 @@ class GovtRepository:
         """
         if not email:
             return None
-        return self.db["govtlist"].find_one({"email": str(email).strip()})
+        normalized = str(email).strip().lower()
+        return self.db["govtlist"].find_one({
+            "$or": [
+                {"auth.email": normalized},
+                {"email": normalized},
+            ]
+        })
+
+    def get_employee_by_ppo(self, ppo_number):
+        if not ppo_number:
+            return None
+        normalized = str(ppo_number).strip()
+        return self.db["govtlist"].find_one({
+            "$or": [
+                {"auth.ppoNumber": normalized},
+                {"ppoNumber": normalized},
+                {"ppo_number": normalized},
+                {"ppo": normalized},
+            ]
+        })
 
     def get_employee_by_employee_id(self, employee_id):
         """
@@ -108,23 +158,29 @@ class GovtRepository:
         aadhaar = _normalize_aadhaar(aadhaar_number)
         if not aadhaar:
             return None
-        return self.db["govtlist"].find_one({"aadhaar_number": aadhaar})
+        aadhaar_last4 = aadhaar[-4:]
+        return self.db["govtlist"].find_one({
+            "$or": [
+                {"identity.aadhaarNumber": aadhaar},
+                {"identity.aadhaar_number": aadhaar},
+                {"identity.aadhaarLast4": aadhaar_last4},
+                {"identity.aadhaar_last4": aadhaar_last4},
+                {"aadhaar_number": aadhaar},
+                {"aadhaar_last4": aadhaar_last4},
+            ]
+        })
 
     def verify_employee_identity(self, identity_data):
         """
-        Verify a government employee by Aadhaar, employee ID, name, DOB, department, and designation.
+        Verify a government employee by Aadhaar, PPO number, name, and department.
         Returns (is_verified, employee_doc, message).
         """
         aadhaar_number = _normalize_aadhaar(identity_data.get("aadhaar_number"))
-        employee_id = str(identity_data.get("employee_id", "")).strip()
+        ppo_number = str(identity_data.get("ppo_number") or identity_data.get("ppoNumber") or "").strip()
         full_name = _normalize_text(identity_data.get("full_name"))
-        date_of_birth = _normalize_date(identity_data.get("date_of_birth"))
         department = _normalize_text(identity_data.get("department"))
-        designation = _normalize_text(identity_data.get("designation"))
-        mobile = _normalize_digits(identity_data.get("mobile") or identity_data.get("phone_number") or identity_data.get("phone"))
-        email = str(identity_data.get("email", "")).strip()
 
-        if not all([aadhaar_number, employee_id, full_name, date_of_birth, department, designation]):
+        if not all([aadhaar_number, ppo_number, full_name, department]):
             return False, None, "Missing required identity fields."
 
         aadhaar_query_values = _digit_query_values(aadhaar_number)
@@ -132,8 +188,11 @@ class GovtRepository:
         aadhaar_last4_values = _digit_query_values(aadhaar_last4)
 
         employee = self.db["govtlist"].find_one({
-            "employee_id": employee_id,
             "$or": [
+                {"identity.aadhaarNumber": {"$in": aadhaar_query_values}},
+                {"identity.aadhaar_number": {"$in": aadhaar_query_values}},
+                {"identity.aadhaarLast4": {"$in": aadhaar_last4_values}},
+                {"identity.aadhaar_last4": {"$in": aadhaar_last4_values}},
                 {"aadhaar_number": {"$in": aadhaar_query_values}},
                 {"aadhaar_last4": {"$in": aadhaar_last4_values}},
             ]
@@ -142,24 +201,18 @@ class GovtRepository:
         if not employee:
             return False, None, "No matching government employee record found."
 
-        if _normalize_text(employee.get("name")) != full_name:
+        official_name = _normalize_text(_first_present(employee, "name", "profile.fullName", "profile.full_name", "auth.name"))
+        if not official_name:
+            official_name = _normalize_text(_first_present(employee, "auth.email"))
+        official_department = _normalize_text(_first_present(employee, "department", "pension.retiredDepartment", "pension.department"))
+
+        if official_name != full_name:
             return False, None, "Name does not match official records."
-        if _normalize_date(employee.get("date_of_birth")) != date_of_birth:
-            return False, None, "Date of birth does not match official records."
-        if _normalize_text(employee.get("department")) != department:
+        official_ppo = str(_first_present(employee, "auth.ppoNumber", "auth.ppo_number", "ppoNumber", "ppo_number")).strip()
+        if official_ppo and official_ppo != ppo_number:
+            return False, None, "PPO number does not match official records."
+        if official_department != department:
             return False, None, "Department does not match official records."
-        if _normalize_text(employee.get("designation")) != designation:
-            return False, None, "Designation does not match official records."
-        if mobile:
-            official_mobiles = {
-                _normalize_digits(employee.get("mobile")),
-                _normalize_digits(employee.get("phone")),
-                _normalize_digits(employee.get("phone_number")),
-            }
-            if mobile not in official_mobiles:
-                return False, None, "Mobile number does not match official records."
-        if email and _normalize_text(employee.get("email")) != _normalize_text(email):
-            return False, None, "Email does not match official records."
 
         return True, employee, "Verified"
 
@@ -173,8 +226,19 @@ class GovtRepository:
         now = datetime.now(timezone.utc).isoformat()
         normalized_mobile = _normalize_digits(mobile)
         mobile_variants = _digit_query_values(mobile)
+        identifier = str(employee_id).strip()
         result = self.db["govtlist"].update_one(
-            {"employee_id": str(employee_id).strip()},
+            {
+                "$or": [
+                    {"employee_id": identifier},
+                    {"aadhaar_number": identifier},
+                    {"aadhaar_last4": identifier[-4:] if len(identifier) >= 4 else identifier},
+                    {"identity.aadhaarNumber": identifier},
+                    {"identity.aadhaar_number": identifier},
+                    {"identity.aadhaarLast4": identifier[-4:] if len(identifier) >= 4 else identifier},
+                    {"identity.aadhaar_last4": identifier[-4:] if len(identifier) >= 4 else identifier},
+                ]
+            },
             {"$set": {
                 "phone": normalized_mobile,
                 "phone_number": normalized_mobile,
@@ -191,6 +255,8 @@ class GovtRepository:
 
         updated = self.db["govtlist"].find_one({
             "$or": [
+                {"auth.phone": {"$in": mobile_variants}},
+                {"auth.phone_number": {"$in": mobile_variants}},
                 {"mobile": {"$in": mobile_variants}},
                 {"phone": {"$in": mobile_variants}},
                 {"phone_number": {"$in": mobile_variants}},
@@ -220,18 +286,26 @@ class GovtRepository:
         search_regex = {"$regex": str(query), "$options": "i"}
         or_query = [
             {"name": search_regex},
+            {"auth.email": search_regex},
+            {"auth.phone": search_regex},
+            {"auth.ppoNumber": search_regex},
             {"employee_id": search_regex},
             {"email": search_regex},
             {"department": search_regex},
+            {"pension.retiredDepartment": search_regex},
             {"designation": search_regex},
         ]
 
         digit_values = _digit_query_values(query)
         if digit_values:
             or_query.extend([
+                {"auth.phone": {"$in": digit_values}},
+                {"auth.phone_number": {"$in": digit_values}},
                 {"phone": {"$in": digit_values}},
                 {"phone_number": {"$in": digit_values}},
                 {"mobile": {"$in": digit_values}},
+                {"identity.aadhaarNumber": {"$in": digit_values}},
+                {"identity.aadhaarLast4": {"$in": _digit_query_values(str(query)[-4:])}},
                 {"aadhaar_number": {"$in": digit_values}},
                 {"aadhaar_last4": {"$in": _digit_query_values(str(query)[-4:])}},
             ])
@@ -279,6 +353,29 @@ class GovtRepository:
         """
         return list(self.db["govtlist"].find())
 
+    def get_basic_employee_data(self):
+        """
+        Retrieves only Aadhaar number, name, and department for all government employees.
+        """
+        projection = {
+            "_id": 0,
+            "auth.phone": 1,
+            "auth.email": 1,
+            "auth.ppoNumber": 1,
+            "identity.aadhaarNumber": 1,
+            "identity.aadhaar_number": 1,
+            "identity.aadhaarLast4": 1,
+            "identity.aadhaar_last4": 1,
+            "name": 1,
+            "profile.fullName": 1,
+            "profile.full_name": 1,
+            "department": 1,
+            "pension.designation": 1,
+            "pension.retiredDepartment": 1,
+            "pension.department": 1,
+        }
+        return list(self.db["govtlist"].find({}, projection))
+
 
 _default_repo: GovtRepository | None = None
 
@@ -302,6 +399,10 @@ def get_employee_by_mobile(phone_number: object):
 
 def get_employee_by_email(email: object):
     return _repo().get_employee_by_email(email)
+
+
+def get_employee_by_ppo(ppo_number: object):
+    return _repo().get_employee_by_ppo(ppo_number)
 
 
 def get_employee_by_employee_id(employee_id: object):

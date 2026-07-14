@@ -66,6 +66,7 @@
                 <div class="insight-card"><h3>Decision summary</h3><p class="muted">Trust, fraud, OCR, and policy are shown together.</p></div>
                 <div class="insight-card"><h3>Evidence</h3><p class="muted">Side-by-side preview keeps claim context visible.</p></div>
                 <div class="insight-card"><h3>Actions</h3><p class="muted">Approve, reject, escalate, or request documents.</p></div>
+                <div class="insight-card"><h3>Officer profile</h3><p class="muted">Review permissions and activity history.</p><a href="{{ url_for('officer.profile') }}" class="btn btn-secondary w-100">Open profile</a></div>
             </div>
 
             {% if total_pages and total_pages > 1 %}

@@ -1,20 +1,12 @@
-from database.mongo_client import hospitals_collection
-
-
-def _normalize_hospital_name(name):
-    return str(name or "").strip().lower()
-
-
 def verify_hospital(hospital_name):
+    from database.hospital_repository import get_hospital_by_name, get_hospital_by_identifier
 
-    hospital = hospitals_collection.find_one(
-        {"name": _normalize_hospital_name(hospital_name)}
-    )
+    hospital = get_hospital_by_identifier(hospital_name) or get_hospital_by_name(hospital_name)
 
     if hospital:
         return {
             "verified": True,
-            "network": hospital.get("network", False)
+            "network": hospital.get("cashless", hospital.get("network", False))
         }
 
     return {

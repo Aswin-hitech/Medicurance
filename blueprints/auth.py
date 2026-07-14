@@ -5,8 +5,8 @@ import secrets
 import bcrypt
 from flask import Blueprint, request, render_template, redirect, session, flash, url_for, make_response, jsonify
 from services.otp_service import store_otp, verify_otp
-from database.user_repository import get_user_by_mobile, create_user, update_password
-from database.govt_repository import get_employee_by_mobile, verify_employee_identity, link_new_mobile
+from database.user_repository import get_user_by_mobile, get_user_by_email, create_user, update_password
+from database.govt_repository import get_employee_by_mobile, get_employee_by_email, get_employee_by_ppo, verify_employee_identity, link_new_mobile
 from database.mongo_client import admins_collection, users_collection, officers_collection, email_verifications_collection
 from config.settings import Config
 from services.auth_service import authenticate_admin, authenticate_officer, authenticate_user, fetch_user_role, needs_verification
@@ -23,6 +23,10 @@ def _clear_identity_verification_state():
     session.pop("pending_role", None)
     session.pop("pending_identity_verification", None)
     session.pop("identity_verification_attempts", None)
+    session.pop("pending_login_mode", None)
+    session.pop("pending_login_phone", None)
+    session.pop("pending_login_ppo", None)
+    session.pop("pending_login_officer_id", None)
 
 
 def _clear_authenticated_identity():
@@ -53,6 +57,31 @@ def _parse_dt(value):
         return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except Exception:
         return None
+
+
+def _pick_nested(document, *paths, default=None):
+    current = document or {}
+    for path in paths:
+        node = current
+        found = True
+        for key in str(path).split("."):
+            if not isinstance(node, dict) or key not in node:
+                found = False
+                break
+            node = node.get(key)
+        if found and node not in (None, ""):
+            return node
+    return default
+
+
+def _government_identity_id(employee, mobile=None):
+    employee = employee or {}
+    return (
+        _pick_nested(employee, "auth.ppoNumber", "auth.ppo_number")
+        or _pick_nested(employee, "identity.aadhaarLast4", "identity.aadhaar_last4")
+        or _pick_nested(employee, "identity.aadhaarNumber", "identity.aadhaar_number")
+        or mobile
+    )
 
 
 def _collection_for_role(role):
@@ -100,11 +129,11 @@ def _verification_payload(employee):
         "verification_completed": True,
         "verification_date": now,
         "updated_at": now,
-        "employee_id": employee.get("employee_id"),
-        "name": employee.get("name"),
-        "email": employee.get("email"),
-        "department": employee.get("department"),
-        "designation": employee.get("designation"),
+        "ppo_number": _pick_nested(employee, "auth.ppoNumber", "auth.ppo_number"),
+        "name": employee.get("name") or _pick_nested(employee, "profile.fullName", "profile.full_name", "auth.name"),
+        "email": employee.get("email") or _pick_nested(employee, "auth.email"),
+        "department": employee.get("department") or _pick_nested(employee, "pension.retiredDepartment", "pension.department"),
+        "designation": employee.get("designation") or _pick_nested(employee, "pension.designation"),
         "mobile_verified": True,
     }
 
@@ -201,17 +230,17 @@ def _sync_officer_verification_state(identifier, employee, officer_doc=None):
     if officer_doc:
         payload["officer_id"] = officer_doc.get("officer_id") or employee.get("employee_id")
         payload["employee_id"] = officer_doc.get("employee_id") or employee.get("employee_id") or payload["officer_id"]
-        payload["name"] = officer_doc.get("name") or employee.get("name")
-        payload["email"] = officer_doc.get("email") or employee.get("email")
-        payload["department"] = officer_doc.get("department") or employee.get("department")
-        payload["designation"] = officer_doc.get("designation") or employee.get("designation")
+        payload["name"] = officer_doc.get("name") or employee.get("name") or _pick_nested(employee, "profile.fullName", "profile.full_name")
+        payload["email"] = officer_doc.get("email") or employee.get("email") or _pick_nested(employee, "auth.email")
+        payload["department"] = officer_doc.get("department") or employee.get("department") or _pick_nested(employee, "pension.retiredDepartment", "pension.department")
+        payload["designation"] = officer_doc.get("designation") or employee.get("designation") or _pick_nested(employee, "pension.designation")
     else:
         payload["officer_id"] = employee.get("employee_id") or normalized_mobile
         payload["employee_id"] = employee.get("employee_id") or payload["officer_id"]
-        payload["name"] = employee.get("name")
-        payload["email"] = employee.get("email")
-        payload["department"] = employee.get("department")
-        payload["designation"] = employee.get("designation")
+        payload["name"] = employee.get("name") or _pick_nested(employee, "profile.fullName", "profile.full_name")
+        payload["email"] = employee.get("email") or _pick_nested(employee, "auth.email")
+        payload["department"] = employee.get("department") or _pick_nested(employee, "pension.retiredDepartment", "pension.department")
+        payload["designation"] = employee.get("designation") or _pick_nested(employee, "pension.designation")
 
     existing_officer = officer_doc
     if not existing_officer:
@@ -297,6 +326,73 @@ def _start_identity_verification(mobile, role="user"):
     return redirect(url_for("auth.verify_identity_page"))
 
 
+def _start_pensioner_otp_flow(phone: str, ppo_number: str):
+    _clear_identity_verification_state()
+    session["pending_login_mode"] = "ppo_otp"
+    session["pending_login_phone"] = _normalize_mobile(phone)
+    session["pending_login_ppo"] = str(ppo_number or "").strip()
+    otp = store_otp(session["pending_login_phone"])
+    if Config.FLASK_ENV == "development":
+        print(f"DEV OTP for {session['pending_login_phone']}: {otp}")
+    flash("OTP sent to your registered mobile number.", "success")
+    return render_template("otp_verify.html", mobile=session["pending_login_phone"])
+
+
+def _start_officer_otp_flow(phone: str, officer_id: str):
+    _clear_identity_verification_state()
+    session["pending_login_mode"] = "officer_otp"
+    session["pending_login_phone"] = _normalize_mobile(phone)
+    session["pending_login_officer_id"] = str(officer_id or "").strip()
+    otp = store_otp(session["pending_login_phone"])
+    if Config.FLASK_ENV == "development":
+        print(f"DEV OTP for {session['pending_login_phone']}: {otp}")
+    flash("OTP sent to the officer's registered mobile number.", "success")
+    return render_template("otp_verify.html", mobile=session["pending_login_phone"])
+
+
+def _normalize_officer_mobile(officer_doc, provided_mobile=None):
+    doc_mobile = _normalize_mobile(
+        (officer_doc or {}).get("auth", {}).get("phone")
+        or (officer_doc or {}).get("phone")
+        or (officer_doc or {}).get("phone_number")
+        or (officer_doc or {}).get("mobile")
+    )
+    provided_mobile = _normalize_mobile(provided_mobile)
+    return provided_mobile or doc_mobile
+
+
+def _resolve_officer_by_id_and_mobile(officer_id, mobile_number):
+    officer = fetch_user_role(officer_id, preferred_role="officer")
+    if not officer.get("found"):
+        return None, "Officer record not found."
+    officer_doc = officer.get("document") or {}
+    official_mobile = _normalize_officer_mobile(officer_doc)
+    provided_mobile = _normalize_mobile(mobile_number)
+    if not official_mobile or not provided_mobile:
+        return None, "Officer mobile number is required."
+    if official_mobile != provided_mobile:
+        return None, "Officer ID and mobile number do not match."
+    return officer_doc, None
+
+
+def _resolve_beneficiary_by_mobile_and_ppo(mobile_number, ppo_number):
+    mobile = _normalize_mobile(mobile_number)
+    ppo = str(ppo_number or "").strip()
+    if not mobile or not ppo:
+        return None, "Mobile number and PPO number are required."
+    pensioner = get_employee_by_ppo(ppo)
+    if not pensioner:
+        return None, "PPO record not found."
+    official_mobile = _normalize_mobile(
+        pensioner.get("auth", {}).get("phone")
+        or pensioner.get("phone")
+        or pensioner.get("mobile")
+    )
+    if official_mobile != mobile:
+        return None, "Mobile number and PPO number do not match."
+    return pensioner, None
+
+
 def _queue_email_verification(email: str, mobile: str | None = None):
     if not email:
         return None
@@ -323,7 +419,7 @@ def _finalize_session_login(role: str, identifier: str, account: dict, redirect_
     session.permanent = True
     session["authenticated"] = True
     session["role"] = role
-    tokens = issue_auth_tokens(identifier, role, extra={"mobile": account.get("mobile", identifier), "user_id": account.get("employee_id") or account.get("officer_id") or identifier})
+    tokens = issue_auth_tokens(identifier, role, extra={"mobile": account.get("mobile", identifier), "user_id": _government_identity_id(account, identifier)})
     response = make_response(redirect(url_for(redirect_endpoint)))
     set_auth_cookies(response, tokens)
     return response
@@ -339,35 +435,73 @@ def login():
 @auth_bp.route("/send_otp", methods=["POST"])
 @limit_route("5 per minute", redirect_endpoint="auth.login", message="Too many OTP requests. Please wait a moment.")
 def send_otp_route():
-    mobile = request.form.get("mobile")
-    if not mobile:
-        flash("Mobile number or Email is required", "danger")
-        return redirect(url_for('auth.login'))
-    
-    if "@" in mobile:
-        resolved = fetch_user_role(mobile)
-        if not resolved.get("found"):
-            flash("Email not found. Please continue using your registered mobile number.", "danger")
+    ppo_number = request.form.get("ppo_number") or request.form.get("ppoNumber")
+    officer_id = request.form.get("officer_id") or request.form.get("officerId")
+    mobile_number = request.form.get("mobile_number") or request.form.get("mobile") or request.form.get("phone")
+
+    if officer_id:
+        officer_doc, error = _resolve_officer_by_id_and_mobile(officer_id, mobile_number)
+        if error:
+            flash(error, "danger")
+            return redirect(url_for("auth.login"))
+        return _start_officer_otp_flow(_normalize_officer_mobile(officer_doc, mobile_number), officer_id)
+
+    if ppo_number:
+        pensioner, error = _resolve_beneficiary_by_mobile_and_ppo(mobile_number, ppo_number)
+        if error:
+            flash(error, "danger")
             return redirect(url_for('auth.login'))
-        # Try to resolve to the registered mobile for OTP
-        user_doc = resolved.get("document", {})
-        mobile = user_doc.get("mobile") or user_doc.get("phone") or user_doc.get("phone_number") or mobile
-    
-    otp = store_otp(mobile)
-    if Config.FLASK_ENV == "development":
-        # DEV-only console output; production OTP delivery can be wired to Twilio later.
-        print(f"DEV OTP for {mobile}: {otp}")
-        
-    return render_template("otp_verify.html", mobile=mobile)
+        return _start_pensioner_otp_flow(_normalize_mobile(mobile_number), ppo_number)
+
+    flash("PPO number or officer ID is required", "danger")
+    return redirect(url_for('auth.login'))
 
 @auth_bp.route("/verify_otp", methods=["POST"])
 @limit_route("5 per minute", redirect_endpoint="auth.login", message="Too many OTP attempts. Please wait a moment.")
 def verify_otp_route():
     mobile = request.form.get("mobile")
     otp = request.form.get("otp")
-    
+
     is_valid, message = verify_otp(mobile, otp)
     if is_valid:
+        if session.get("pending_login_mode") == "ppo_otp":
+            ppo_number = session.get("pending_login_ppo")
+            pensioner = get_employee_by_ppo(ppo_number) or get_employee_by_mobile(mobile)
+            if not pensioner:
+                flash("PPO record not found. Please log in again.", "danger")
+                return redirect(url_for("auth.login"))
+            session["mobile"] = mobile
+            session["user_id"] = _government_identity_id(pensioner, mobile)
+            session["role"] = "user"
+            session["authenticated"] = True
+            tokens = issue_auth_tokens(session["user_id"], "user", extra={"mobile": mobile, "user_id": session["user_id"], "ppo_number": ppo_number})
+            response = make_response(redirect(url_for("user.dashboard")))
+            set_auth_cookies(response, tokens)
+            _clear_identity_verification_state()
+            log_audit(mobile, "login", "PPO OTP login successful. Role: user")
+            flash("Logged in successfully!", "success")
+            return response
+
+        if session.get("pending_login_mode") == "officer_otp":
+            officer_id = session.get("pending_login_officer_id")
+            resolved = fetch_user_role(officer_id, preferred_role="officer")
+            officer_doc = resolved.get("document") or {}
+            if not officer_doc:
+                flash("Officer record not found. Please log in again.", "danger")
+                return redirect(url_for("auth.login"))
+            session["mobile"] = mobile
+            session["user_id"] = officer_doc.get("officer_id") or officer_id or mobile
+            session["officer_name"] = officer_doc.get("name") or _pick_nested(officer_doc, "profile.fullName", "profile.full_name") or "Claims Officer"
+            session["role"] = "officer"
+            session["authenticated"] = True
+            tokens = issue_auth_tokens(session["user_id"], "officer", extra={"mobile": mobile, "user_id": session["user_id"], "officer_id": officer_id})
+            response = make_response(redirect(url_for("officer.dashboard")))
+            set_auth_cookies(response, tokens)
+            _clear_identity_verification_state()
+            log_audit(mobile, "login", "Officer OTP login successful. Role: officer")
+            flash("Logged in successfully!", "success")
+            return response
+
         resolved = fetch_user_role(mobile)
         if not resolved.get("found"):
             flash("User not found. Please register first.", "danger")
@@ -402,7 +536,7 @@ def verify_otp_route():
         if employee or account.get("is_government_employee"):
             _clear_authenticated_identity()
             session["mobile"] = mobile
-            session["user_id"] = employee.get("employee_id") if employee else mobile
+            session["user_id"] = _government_identity_id(employee, mobile)
             session["role"] = role
             flash("Logged in successfully!", "success")
             logger.info("[AUTH] User login success | mobile=%s", mobile)
@@ -415,89 +549,100 @@ def verify_otp_route():
 
 @auth_bp.route("/register")
 def register_page():
-    return render_template("register.html")
+    return redirect(url_for("auth.request_access_page"))
 
 @auth_bp.route("/register_user", methods=["POST"])
 def register_submit():
-    mobile = request.form.get("mobile")
-    password = request.form.get("password")
-    confirm_password = request.form.get("confirm_password")
-    
-    if get_user_by_mobile(mobile):
-        flash("Mobile number already registered", "warning")
-        return redirect(url_for('auth.register_page'))
+    return redirect(url_for("auth.request_access_page"))
 
-    if password != confirm_password:
-        flash("Passwords do not match.", "danger")
-        return redirect(url_for('auth.register_page'))
 
-    ok, errors = validate_password_policy(password)
-    if not ok:
-        flash(" ".join(errors), "danger")
-        return redirect(url_for('auth.register_page'))
+@auth_bp.route("/request-access")
+def request_access_page():
+    return render_template("request_access.html")
 
-    identity_data = {
-        "aadhaar_number": request.form.get("aadhaar_number"),
-        "employee_id": request.form.get("employee_id"),
-        "full_name": request.form.get("full_name"),
-        "date_of_birth": request.form.get("date_of_birth"),
-        "department": request.form.get("department"),
-        "designation": request.form.get("designation"),
-        "email": request.form.get("email"),
-        "mobile": mobile,
+
+@auth_bp.route("/request-access", methods=["POST"])
+def request_access_submit():
+    from database.mongo_client import db as mongo_db
+
+    payload = {
+        "requested_role": request.form.get("requested_role", "user"),
+        "full_name": request.form.get("full_name", "").strip(),
+        "email": request.form.get("email", "").strip().lower(),
+        "phone": _normalize_mobile(request.form.get("phone")),
+        "ppo_number": request.form.get("ppo_number", "").strip(),
+        "officer_id": request.form.get("officer_id", "").strip(),
+        "department": request.form.get("department", "").strip(),
+        "aadhaar_number": _normalize_mobile(request.form.get("aadhaar_number")),
+        "designation": request.form.get("designation", "").strip(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "status": "Pending",
     }
-    is_verified, employee, message = verify_employee_identity(identity_data)
-    extra_fields = {
-        "is_government_employee": False,
-        "claim_eligibility": False,
-        "email": request.form.get("email"),
-        "email_verified": False,
-    }
-    if is_verified and employee:
-        extra_fields.update(_verification_payload(employee))
-        extra_fields["is_government_employee"] = True
-        extra_fields["claim_eligibility"] = employee.get("claim_eligibility", True)
-    else:
-        log_audit(mobile, "identity_verification_failed", f"Registration government verification failed: {message}")
-
-    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
-    create_user(mobile, hashed, extra_fields=extra_fields)
-    verification_token = _queue_email_verification(request.form.get("email"), mobile=mobile)
-    log_audit(mobile, "register", "New user registered via password", {"government_verified": bool(is_verified)})
-    if is_verified:
-        flash("Registration successful. Please login.", "success")
-    else:
-        flash("Registration successful, but government verification is pending. Claims require identity verification.", "warning")
-    if verification_token:
-        logger.info("[AUTH] Email verification token generated for %s", request.form.get("email"))
-    return redirect(url_for('auth.login'))
+    if not payload["full_name"]:
+        flash("Full name is required.", "danger")
+        return redirect(url_for("auth.request_access_page"))
+    mongo_db["access_requests"].insert_one(payload)
+    flash("Your access request has been sent to the admin team.", "success")
+    return redirect(url_for("auth.login"))
 
 @auth_bp.route("/login_user", methods=["POST"])
 @limit_route("10 per minute", redirect_endpoint="auth.login", message="Too many login attempts. Please try again later.")
 def login_submit():
     submitted_role = str(request.form.get("role", "user")).strip().lower()
     password = request.form.get("password")
-    identifier = request.form.get("email") or request.form.get("mobile")
-    resolved = fetch_user_role(identifier)
+    ppo_number = request.form.get("ppo_number") or request.form.get("ppoNumber")
+    mobile_number = request.form.get("mobile_number") or request.form.get("mobile") or request.form.get("phone")
+
+    # Admin submits field name 'email'; Officer and Beneficiary submit 'identifier'
+    # (set dynamically by handleRoleChange in the frontend).
+    if submitted_role == "admin":
+        identifier = str(request.form.get("email") or "").strip().lower()
+    else:
+        identifier = str(
+            request.form.get("identifier")
+            or request.form.get("email")
+            or request.form.get("mobile_number")
+            or ""
+        ).strip()
+
+    # ------------------------------------------------------------------ #
+    # Beneficiary OTP path: PPO + Mobile → send OTP (no password needed) #
+    # ------------------------------------------------------------------ #
+    if ppo_number:
+        pensioner, error = _resolve_beneficiary_by_mobile_and_ppo(mobile_number, ppo_number)
+        if error:
+            flash(error, "danger")
+            return redirect(url_for("auth.login"))
+        return _start_pensioner_otp_flow(_normalize_mobile(mobile_number), ppo_number)
+
+    # ------------------------------------------------------------------ #
+    # Password login path (Admin / Officer / Beneficiary)                #
+    # ------------------------------------------------------------------ #
+    if not identifier:
+        flash("Please enter your email or mobile number.", "danger")
+        return redirect(url_for("auth.login"))
+
+    resolved = fetch_user_role(identifier, preferred_role=submitted_role)
     if not resolved.get("found"):
-        if "@" in str(identifier or ""):
-            flash("Email not found. Please continue using your registered mobile number.", "danger")
-            return redirect(url_for('auth.login'))
-        log_audit(identifier or "unknown", "failed_authentication", "Login attempted for unknown account", {"submitted_role": submitted_role})
-        flash("Invalid credentials", "danger")
-        return redirect(url_for('auth.login'))
+        if "@" in identifier:
+            flash("Email not found. Please use your registered email.", "danger")
+        else:
+            log_audit(identifier, "failed_authentication", "Login attempted for unknown account", {"submitted_role": submitted_role})
+            flash("Invalid credentials", "danger")
+        return redirect(url_for("auth.login"))
 
     role = str(resolved.get("role") or "user").strip().lower()
     account = resolved.get("document") or {}
+
     if submitted_role and submitted_role != role:
         log_audit(identifier, "security_violation", "Login role mismatch rejected", {"submitted_role": submitted_role, "stored_role": role})
         flash("Invalid credentials", "danger")
-        return redirect(url_for('auth.login'))
+        return redirect(url_for("auth.login"))
 
     if _is_account_locked(account):
         log_audit(identifier, "failed_authentication", "Login attempted while account is locked", {"role": role})
         flash("Account temporarily locked. Please try again after 15 minutes.", "danger")
-        return redirect(url_for('auth.login'))
+        return redirect(url_for("auth.login"))
 
     if role == "admin":
         auth_result = authenticate_admin(identifier, password)
@@ -543,9 +688,6 @@ def login_submit():
 
     return _start_identity_verification(identifier, "user")
 
-    flash("Invalid credentials", "danger")
-    return redirect(url_for('auth.login'))
-
 @auth_bp.route("/forgot_password")
 def forgot_password():
     return render_template("forgot_password.html")
@@ -554,7 +696,7 @@ def forgot_password():
 @limit_route("5 per minute", redirect_endpoint="auth.forgot_password", message="Too many reset requests. Please wait a moment.")
 def reset_otp_request():
     mobile = request.form.get("mobile")
-    if not get_user_by_mobile(mobile):
+    if not (get_user_by_mobile(mobile) or get_user_by_email(mobile) or get_employee_by_mobile(mobile) or get_employee_by_email(mobile)):
         flash("Mobile number not registered", "danger")
         return redirect(url_for('auth.forgot_password'))
         
@@ -578,7 +720,21 @@ def reset_password_submit():
             flash(" ".join(errors), "danger")
             return render_template("reset_password.html", mobile=mobile)
         hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt())
-        update_password(mobile, hashed)
+        user = get_user_by_mobile(mobile) or get_user_by_email(mobile)
+        officer = get_employee_by_mobile(mobile) or get_employee_by_email(mobile)
+        if user and user.get("_id"):
+            users_collection.update_one(
+                {"_id": user["_id"]},
+                {"$set": {"auth.passwordHash": hashed, "updated_at": datetime.now(timezone.utc).isoformat()}}
+            )
+        if officer and officer.get("auth"):
+            if officer.get("role") == "officer":
+                officers_collection.update_one(
+                    {"_id": officer["_id"]},
+                    {"$set": {"auth.passwordHash": hashed, "updatedAt": datetime.now(timezone.utc).isoformat()}}
+                )
+            else:
+                update_password(mobile, hashed)
         log_audit(mobile, "password_reset", "User reset password via OTP")
         flash("Password updated successfully.", "success")
         return redirect(url_for('auth.login'))
@@ -614,19 +770,16 @@ def verify_identity_submit():
 
     identity_data = {
         "aadhaar_number": request.form.get("aadhaar_number"),
-        "employee_id": request.form.get("employee_id"),
+        "ppo_number": request.form.get("ppo_number") or request.form.get("ppoNumber"),
         "full_name": request.form.get("full_name"),
-        "date_of_birth": request.form.get("date_of_birth"),
         "department": request.form.get("department"),
-        "designation": request.form.get("designation"),
-        "email": request.form.get("email"),
         "mobile": pending_mobile,
     }
 
     is_verified, employee, message = verify_employee_identity(identity_data)
     if is_verified and employee:
         try:
-            link_new_mobile(employee.get("employee_id"), pending_mobile)
+            link_new_mobile(employee.get("employee_id") or employee.get("officer_id") or employee.get("aadhaar_number") or employee.get("identity", {}).get("aadhaarLast4"), pending_mobile)
         except Exception as exc:
             log_audit(pending_mobile, "identity_verification_failed", f"Failed to link mobile number: {str(exc)}")
             flash("Identity verification failed.", "danger")
@@ -666,19 +819,19 @@ def verify_identity_submit():
             users_collection.update_one(
                 {"_id": existing_user["_id"]},
                 {"$set": {
-                    "employee_id": employee.get("employee_id"),
-                    "department": employee.get("department"),
-                    "designation": employee.get("designation"),
+                    "ppo_number": employee.get("auth", {}).get("ppoNumber") or employee.get("ppo_number"),
+                    "department": employee.get("department") or _pick_nested(employee, "pension.retiredDepartment", "pension.department"),
+                    "designation": employee.get("designation") or _pick_nested(employee, "pension.designation"),
                     "policy_number": employee.get("policy_number"),
                     "insurance_provider": employee.get("insurance_provider"),
                     "policy_start": employee.get("policy_start"),
                     "policy_end": employee.get("policy_end"),
                     "claim_eligibility": employee.get("claim_eligibility"),
                     "is_government_employee": True,
-                    "name": employee.get("name"),
+                    "name": employee.get("name") or _pick_nested(employee, "profile.fullName", "profile.full_name"),
                     "gender": employee.get("gender"),
                     "age": employee.get("age"),
-                    "date_of_birth": employee.get("date_of_birth"),
+                    "date_of_birth": employee.get("date_of_birth") or _pick_nested(employee, "profile.dob"),
                     "experience_years": employee.get("experience_years"),
                     "date_of_joining": employee.get("date_of_joining"),
                     "salary": employee.get("salary"),
@@ -690,7 +843,7 @@ def verify_identity_submit():
                     "state": employee.get("state"),
                     "pincode": employee.get("pincode"),
                     "email": employee.get("email"),
-                    "aadhaar_last4": employee.get("aadhaar_last4"),
+                    "aadhaar_last4": employee.get("aadhaar_last4") or _pick_nested(employee, "identity.aadhaarLast4", "identity.aadhaar_last4"),
                     "pan_last4": employee.get("pan_last4"),
                     "nominee_name": employee.get("nominee_name"),
                     "relationship": employee.get("relationship"),
@@ -709,12 +862,12 @@ def verify_identity_submit():
                 {"$set": {
                     "mobile": pending_mobile,
                     "role": "user",
-                    "employee_id": employee.get("employee_id"),
-                    "department": employee.get("department"),
-                    "designation": employee.get("designation"),
+                    "ppo_number": employee.get("auth", {}).get("ppoNumber") or employee.get("ppo_number"),
+                    "department": employee.get("department") or _pick_nested(employee, "pension.retiredDepartment", "pension.department"),
+                    "designation": employee.get("designation") or _pick_nested(employee, "pension.designation"),
                     "is_government_employee": True,
-                    "name": employee.get("name"),
-                    "email": employee.get("email"),
+                    "name": employee.get("name") or _pick_nested(employee, "profile.fullName", "profile.full_name"),
+                    "email": employee.get("email") or _pick_nested(employee, "auth.email"),
                     **verification_flags,
                 }},
                 upsert=True
@@ -724,11 +877,11 @@ def verify_identity_submit():
         _clear_identity_verification_state()
         _clear_authenticated_identity()
         session["mobile"] = pending_mobile
-        session["user_id"] = employee.get("employee_id") or pending_mobile
+        session["user_id"] = _government_identity_id(employee, pending_mobile)
         session["role"] = resolved_role
         session["authenticated"] = True
 
-        log_audit(pending_mobile, "identity_verified", f"Government identity verified for employee_id={employee.get('employee_id')}")
+        log_audit(pending_mobile, "identity_verified", f"Government identity verified for ppo_number={_pick_nested(employee, 'auth.ppoNumber', 'auth.ppo_number')}")
         flash("Identity verified successfully. Welcome back!", "success")
         logger.info("[AUTH] User login success | mobile=%s", pending_mobile)
         return redirect(url_for('user.dashboard'))

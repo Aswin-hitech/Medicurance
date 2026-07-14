@@ -1,7 +1,6 @@
 import pandas as pd
 import re
 from database.govt_repository import (
-    get_employee_by_employee_id,
     get_employee_by_mobile,
     get_employee_by_email,
     get_employee_by_aadhaar,
@@ -28,7 +27,7 @@ def validate_and_preview_csv(file_path):
             "stats": {"total": 0, "valid": 0, "invalid": 0}
         }
 
-    required_cols = ['aadhaar_number', 'employee_id', 'name', 'phone_number', 'email', 'department', 'designation']
+    required_cols = ['aadhaar_number', 'name', 'department']
     
     # Check for missing required column names
     missing_cols = [col for col in required_cols if col not in df.columns]
@@ -48,7 +47,6 @@ def validate_and_preview_csv(file_path):
     errors_list = []
     
     # To track duplicates in the current uploaded file
-    seen_ids = set()
     seen_phones = set()
     seen_emails = set()
     seen_aadhaars = set()
@@ -61,31 +59,22 @@ def validate_and_preview_csv(file_path):
         row_errors = []
         
         # 1. Clean primary identifiers
-        emp_id = str(row_dict.get('employee_id', '')).strip()
         aadhaar = re.sub(r"\D", "", str(row_dict.get('aadhaar_number', '')).strip())
         name = str(row_dict.get('name', '')).strip()
+        dept = str(row_dict.get('department', '')).strip()
         phone = str(row_dict.get('phone_number', '')).strip()
         email = str(row_dict.get('email', '')).strip()
-        dept = str(row_dict.get('department', '')).strip()
         desg = str(row_dict.get('designation', '')).strip()
 
         # 2. Check for missing required fields
         if not aadhaar:
             row_errors.append("Aadhaar number is missing")
-        if not emp_id:
-            row_errors.append("Employee ID is missing")
         if aadhaar and (not aadhaar.isdigit() or len(aadhaar) != 12):
             row_errors.append(f"Invalid Aadhaar number format: '{aadhaar}'")
         if not name:
             row_errors.append("Name is missing")
-        if not phone:
-            row_errors.append("Phone number is missing")
-        if not email:
-            row_errors.append("Email is missing")
         if not dept:
             row_errors.append("Department is missing")
-        if not desg:
-            row_errors.append("Designation is missing")
 
         # 3. Email Format Validation
         if email and not email_regex.match(email):
@@ -96,12 +85,6 @@ def validate_and_preview_csv(file_path):
             row_errors.append(f"Invalid phone number format: '{phone}'")
 
         # 5. File Duplicate Detection
-        if emp_id:
-            if emp_id in seen_ids:
-                row_errors.append(f"Duplicate Employee ID in CSV: '{emp_id}'")
-            else:
-                seen_ids.add(emp_id)
-
         if aadhaar:
             if aadhaar in seen_aadhaars:
                 row_errors.append(f"Duplicate Aadhaar Number in CSV: '{aadhaar}'")
@@ -124,8 +107,6 @@ def validate_and_preview_csv(file_path):
         if not row_errors:
             if get_employee_by_aadhaar(aadhaar):
                 row_errors.append(f"Aadhaar number already exists in system: '{aadhaar}'")
-            if get_employee_by_employee_id(emp_id):
-                row_errors.append(f"Employee ID already exists in system: '{emp_id}'")
             if get_employee_by_mobile(phone):
                 row_errors.append(f"Phone number already exists in system: '{phone}'")
             if get_employee_by_email(email):
@@ -136,7 +117,6 @@ def validate_and_preview_csv(file_path):
         
         # Construct record for DB insert
         record = {
-            "employee_id": emp_id,
             "aadhaar_number": aadhaar,
             "name": name,
             "gender": str(row_dict.get('gender', 'Male')).strip(),
@@ -177,7 +157,6 @@ def validate_and_preview_csv(file_path):
         preview_rows.append({
             "row_num": row_num,
             "aadhaar_number": aadhaar,
-            "employee_id": emp_id,
             "name": name,
             "phone_number": phone,
             "email": email,
@@ -193,7 +172,7 @@ def validate_and_preview_csv(file_path):
             for err in row_errors:
                 errors_list.append({
                     "row": row_num,
-                    "employee_id": emp_id,
+                    "aadhaar_number": aadhaar,
                     "field": "Validation",
                     "message": err
                 })
@@ -201,7 +180,7 @@ def validate_and_preview_csv(file_path):
     return {
         "success": True,
         "message": "CSV parsed successfully",
-        "headers": ['row_num', 'aadhaar_number', 'employee_id', 'name', 'phone_number', 'email', 'department', 'designation', 'status', 'errors'],
+        "headers": ['row_num', 'aadhaar_number', 'name', 'phone_number', 'email', 'department', 'designation', 'status', 'errors'],
         "preview_rows": preview_rows,
         "clean_records": clean_records,
         "errors": errors_list,

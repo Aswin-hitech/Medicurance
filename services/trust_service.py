@@ -3,7 +3,7 @@ services/trust_service.py
 Phase 7 — Trust Score Engine
 """
 import logging
-from database.mongo_client import claims_collection, users_collection
+from database.mongo_client import claims_collection, users_collection, govt_collection
 from database.hospital_repository import verify_hospital as repo_verify_hospital
 
 logger = logging.getLogger(__name__)
@@ -57,8 +57,14 @@ def calculate_trust_score(mobile: str, hospital_name: str, ai_confidence: float,
         reasoning.append("No strong duplicate indicators found.")
         
     # 5. Government Employee Verification (0-100)
-    user_doc = users_collection.find_one({"mobile": mobile})
-    is_govt_verified = user_doc and user_doc.get("is_government_employee")
+    # Beneficiaries live in govtlist (govt_collection), NOT in users collection.
+    # Check govtlist first by auth.phone or mobile, fall back to users.
+    phone_digits = "".join(ch for ch in str(mobile or "") if ch.isdigit())
+    user_doc = (
+        govt_collection.find_one({"$or": [{"auth.phone": phone_digits}, {"mobile": phone_digits}, {"phone": phone_digits}]})
+        or users_collection.find_one({"mobile": phone_digits})
+    )
+    is_govt_verified = bool(user_doc)
     if is_govt_verified:
         govt_verified = 100.0
         reasoning.append("Claimant profile successfully verified against official Government Employee Database.")

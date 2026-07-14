@@ -31,7 +31,7 @@
     <form action="{{ url_for('admin.manage_officers') }}" method="GET" style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
         <div class="form-group" style="flex: 2; min-width: 250px; margin-bottom: 0;">
             <label class="form-label"><i class="fas fa-search"></i> Search Officer</label>
-            <input type="text" name="q" class="form-control" placeholder="Search Officer ID, Employee ID, Name, Phone, Email..." value="{{ search_query }}">
+            <input type="text" name="q" class="form-control" placeholder="Search Officer ID, Aadhaar, Name, Phone, Email..." value="{{ search_query }}">
         </div>
         
         <div class="form-group" style="flex: 1; min-width: 180px; margin-bottom: 0;">
@@ -72,7 +72,7 @@
                     <th>Name</th>
                     <th>Department & Designation</th>
                     <th>District</th>
-                    <th>Employee ID</th>
+                    <th>Aadhaar</th>
                     <th>Phone & Email</th>
                     <th>Joining Date</th>
                     <th>Status</th>
@@ -86,7 +86,7 @@
                     <td><strong>{{ off.name }}</strong></td>
                     <td>{{ off.department }}<br><small class="text-muted">{{ off.designation }}</small></td>
                     <td>{{ off.district }}</td>
-                    <td>{{ off.employee_id or 'N/A' }}</td>
+                    <td>{{ off.aadhaar_number or 'N/A' }}</td>
                     <td>{{ off.phone_number or off.phone or 'N/A' }}<br><small class="text-muted">{{ off.email }}</small></td>
                     <td>{{ off.joining_date or off.date_of_joining or 'N/A' }}</td>
                     <td>
@@ -147,8 +147,8 @@
                     <input type="text" name="officer_id" class="form-control" placeholder="e.g. OFF456" required>
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Employee ID</label>
-                    <input type="text" name="employee_id" class="form-control" placeholder="e.g. GOVOFF001">
+                    <label class="form-label">Aadhaar Number</label>
+                    <input type="text" name="aadhaar_number" class="form-control" placeholder="12-digit Aadhaar">
                 </div>
             </div>
 
@@ -214,8 +214,8 @@
                     <input type="text" id="edit_officer_id" class="form-control" readonly style="background-color: var(--bg-alt); cursor: not-allowed;">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Employee ID</label>
-                    <input type="text" name="employee_id" id="edit_employee_id" class="form-control">
+                    <label class="form-label">Aadhaar Number</label>
+                    <input type="text" name="aadhaar_number" id="edit_aadhaar_number" class="form-control">
                 </div>
             </div>
 
@@ -272,7 +272,7 @@
     
     function openEditModal(officer) {
         document.getElementById('edit_officer_id').value = officer.officer_id;
-        document.getElementById('edit_employee_id').value = officer.employee_id || '';
+        document.getElementById('edit_aadhaar_number').value = officer.aadhaar_number || '';
         document.getElementById('edit_name').value = officer.name;
         document.getElementById('edit_department').value = officer.department;
         document.getElementById('edit_designation').value = officer.designation;

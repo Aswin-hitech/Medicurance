@@ -42,7 +42,7 @@ def _identifier_queries(identifier):
     digit_values = _digit_values(normalized)
     identity_query = {
         "$or": [
-            {"employee_id": normalized},
+            {"auth.ppoNumber": normalized},
             {"officer_id": normalized},
             {"phone": {"$in": digit_values}},
             {"mobile": {"$in": digit_values}},
@@ -60,7 +60,7 @@ def _identifier_queries(identifier):
                 {"mobile": {"$in": digit_values}},
                 {"phone": {"$in": digit_values}},
                 {"phone_number": {"$in": digit_values}},
-                {"employee_id": normalized},
+                {"auth.ppoNumber": normalized},
                 {"officer_id": normalized},
             ]
         },
@@ -73,7 +73,7 @@ def _safe_summary(doc):
     keys = [
         "_id",
         "officer_id",
-        "employee_id",
+        "ppo_number",
         "name",
         "email",
         "mobile",
@@ -105,7 +105,7 @@ def _print_lookup(name, collection, query):
 
 def main():
     parser = argparse.ArgumentParser(description="Trace MediCurance login lookup and authentication flow.")
-    parser.add_argument("identifier", help="Mobile number, email, officer_id, or employee_id")
+    parser.add_argument("identifier", help="Mobile number, email, officer_id, or PPO number")
     parser.add_argument("--role", choices=["admin", "officer", "user"], default="officer")
     parser.add_argument("--password", default=None, help="Optional password to verify. Do not use on shared terminals.")
     args = parser.parse_args()

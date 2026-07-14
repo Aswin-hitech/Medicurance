@@ -26,14 +26,19 @@ def _get_client():
     if _supabase_client is not None:
         return _supabase_client
 
-    if not Config.SUPABASE_URL or not Config.SUPABASE_SECRET_KEY:
+    api_key = (
+        getattr(Config, "SUPABASE_SERVICE_ROLE_KEY", "")
+        or Config.SUPABASE_SECRET_KEY
+        or Config.SUPABASE_API_KEY
+    )
+    if not Config.SUPABASE_URL or not api_key:
         logger.warning("[Storage] Supabase credentials not configured — uploads will be skipped.")
         return None
 
     try:
         from supabase import create_client
-        # Use service_role key so we can write to the bucket without user auth
-        _supabase_client = create_client(Config.SUPABASE_URL, Config.SUPABASE_SECRET_KEY)
+        # Use the service-role key when available, otherwise fall back to the API key.
+        _supabase_client = create_client(Config.SUPABASE_URL, api_key)
         logger.info("[Storage] Supabase client initialised successfully.")
         return _supabase_client
     except Exception as exc:
@@ -45,14 +50,15 @@ def _get_client():
 # Core helpers
 # ─────────────────────────────────────────────
 
-def _build_storage_path(filename: str) -> str:
+def build_storage_path(filename: str, folder: str | None = None) -> str:
     """
     Build a unique storage path inside the bucket.
-    Format: claims/<epoch_ms>_<sanitised_filename>
+    Format: <folder>/<epoch_ms>_<sanitised_filename>
     """
     epoch_ms = int(time.time() * 1000)
     safe_name = Path(filename).name.replace(" ", "_")
-    return f"claims/{epoch_ms}_{safe_name}"
+    folder = str(folder or "claims").strip("/").replace("\\", "/")
+    return f"{folder}/{epoch_ms}_{safe_name}"
 
 
 def _detect_mime(file_path: str) -> str:
@@ -72,7 +78,13 @@ def _detect_mime(file_path: str) -> str:
 # Public API
 # ─────────────────────────────────────────────
 
-def upload_file(file_path: str, filename: str | None = None, bucket_name: str | None = None) -> str | None:
+def upload_file(
+    file_path: str,
+    filename: str | None = None,
+    bucket_name: str | None = None,
+    folder: str | None = None,
+    storage_path: str | None = None,
+) -> str | None:
     """
     Upload a file to Supabase Storage.
 
@@ -86,12 +98,12 @@ def upload_file(file_path: str, filename: str | None = None, bucket_name: str | 
     """
     filename = filename or os.path.basename(file_path)
     bucket_name = bucket_name or Config.SUPABASE_BILL_BUCKET
-    storage_path = _build_storage_path(filename)
+    storage_path = storage_path or build_storage_path(filename, folder=folder)
 
     client = _get_client()
     if client is None:
-        logger.warning("[Storage] No Supabase client — upload skipped.")
-        return None
+        logger.warning("[Storage] No Supabase client — upload skipped, returning local file path.")
+        return file_path
 
     last_error = None
     for attempt in range(3):
@@ -102,7 +114,7 @@ def upload_file(file_path: str, filename: str | None = None, bucket_name: str | 
             mime_type = _detect_mime(file_path)
             bucket = client.storage.from_(bucket_name)
             # Exponential backoff makes temporary storage/network errors survivable.
-            attempt_path = storage_path if attempt == 0 else _build_storage_path(f"retry{attempt}_{filename}")
+            attempt_path = storage_path if attempt == 0 else build_storage_path(f"retry{attempt}_{filename}", folder=folder)
             bucket.upload(
                 path=attempt_path,
                 file=file_bytes,
@@ -121,33 +133,15 @@ def upload_file(file_path: str, filename: str | None = None, bucket_name: str | 
             time.sleep(2 ** attempt)
 
     logger.error(f"[Storage] Upload failed after retries: {last_error}")
-    return fallback_upload(file_path, filename, bucket_name=bucket_name)
-
-    try:
-        with open(file_path, "rb") as f:
-            file_bytes = f.read()
-
-        mime_type = _detect_mime(file_path)
-        bucket = client.storage.from_(Config.SUPABASE_BUCKET)
-        bucket.upload(
-            path=storage_path,
-            file=file_bytes,
-            file_options={
-                "content-type": mime_type,
-                "cache-control": "3600",
-                "upsert": "false",
-            },
-        )
-        public_url = generate_public_url(storage_path)
-        logger.info(f"[Storage] Uploaded → {storage_path}")
-        return public_url
-
-    except Exception as exc:
-        logger.error(f"[Storage] Upload failed on first attempt: {exc}")
-        return fallback_upload(file_path, filename)
+    return fallback_upload(file_path, filename, bucket_name=bucket_name, folder=folder) or file_path
 
 
-def fallback_upload(file_path: str, filename: str, bucket_name: str | None = None) -> str | None:
+def fallback_upload(
+    file_path: str,
+    filename: str,
+    bucket_name: str | None = None,
+    folder: str | None = None,
+) -> str | None:
     """
     Retry upload once after a short delay.
     Logs a permanent failure record if the retry also fails.
@@ -158,9 +152,9 @@ def fallback_upload(file_path: str, filename: str, bucket_name: str | None = Non
     client = _get_client()
     if client is None:
         _log_upload_failure(filename, "Supabase client unavailable")
-        return None
+        return file_path
 
-    storage_path = _build_storage_path(f"retry_{filename}")
+    storage_path = build_storage_path(f"retry_{filename}", folder=folder)
     try:
         with open(file_path, "rb") as f:
             file_bytes = f.read()
@@ -179,7 +173,7 @@ def fallback_upload(file_path: str, filename: str, bucket_name: str | None = Non
 
     except Exception as exc:
         _log_upload_failure(filename, str(exc))
-        return None
+        return file_path
 
 
 def delete_file(storage_path: str, bucket_name: str | None = None) -> bool:

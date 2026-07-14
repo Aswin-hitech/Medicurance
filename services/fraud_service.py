@@ -6,7 +6,7 @@ from difflib import SequenceMatcher
 import logging
 
 from config.settings import Config
-from database.mongo_client import claims_collection, users_collection
+from database.mongo_client import claims_collection, users_collection, govt_collection
 from services.duplicate_detection_service import analyze_duplicate_claim, calculate_file_hash
 
 logger = logging.getLogger(__name__)
@@ -75,7 +75,7 @@ def detect_fraud(mobile, amount, hospital, file_path, extracted_text):
         if rc.get("extracted_text"):
             sim = similar(extracted_text, rc["extracted_text"])
             if sim > 0.85:
-                fraud_flags.append(f"High text similarity ({int(sim*100)}%) with previous claim {rc.get('claim_id')[-8:]}.")
+                fraud_flags.append(f"High text similarity ({int(sim*100)}%) with previous claim {str(rc.get('claim_id') or '')[-8:]}.")
                 risk_score += Config.FRAUD_WEIGHTS["similarity"]
                 break
 
@@ -112,8 +112,13 @@ def detect_fraud(mobile, amount, hospital, file_path, extracted_text):
         risk_score += 15
 
     # 6. Government Employee Verification Mismatch
-    user_doc = users_collection.find_one({"mobile": mobile})
-    if not user_doc or not user_doc.get("is_government_employee"):
+    # Beneficiaries are stored in govtlist — check there first.
+    phone_digits = "".join(ch for ch in str(mobile or "") if ch.isdigit())
+    user_doc = (
+        govt_collection.find_one({"$or": [{"auth.phone": phone_digits}, {"mobile": phone_digits}, {"phone": phone_digits}]})
+        or users_collection.find_one({"mobile": phone_digits})
+    )
+    if not user_doc:
         fraud_flags.append("Claimant is not a verified government employee.")
         risk_score += 40
 

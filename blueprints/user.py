@@ -1,7 +1,9 @@
-from flask import Blueprint, flash, redirect, render_template, request, send_file, session, url_for
+from datetime import datetime, timezone
+
+from flask import Blueprint, flash, redirect, render_template, request, send_file, session, url_for, jsonify
 from utils.auth_utils import role_required
 
-from database.mongo_client import claims_collection, users_collection
+from database.mongo_client import claims_collection, users_collection, govt_collection
 from database.hospital_repository import get_all_hospitals
 from database.claim_repository import get_claims_by_user
 from utils.status_utils import normalize_claim_status
@@ -10,6 +12,8 @@ from services.auth_service import resolve_role
 from services.claim_view_service import enrich_claim_for_view
 from utils.rate_limiter import limit_route
 from utils.logger import log_audit
+from services.pensioner_service import build_pensioner_profile, upload_owner_document, list_owner_documents, delete_owner_document, search_claims_knowledge
+from config.settings import Config
 
 user_bp = Blueprint('user', __name__)
 
@@ -29,18 +33,30 @@ def claim_request():
 def submit_claim():
     mobile = session["mobile"]
 
-    user_doc = users_collection.find_one({"mobile": mobile}) or {}
-    if not user_doc.get("is_government_employee"):
+    phone_digits = "".join(ch for ch in str(mobile or "") if ch.isdigit())
+    govt_user = govt_collection.find_one({"$or": [{"auth.phone": phone_digits}, {"mobile": phone_digits}, {"phone": phone_digits}]})
+    
+    if govt_user:
+        is_govt_verified = True
+    else:
+        user_doc = users_collection.find_one({"mobile": phone_digits}) or {}
+        is_govt_verified = user_doc.get("is_government_employee") == True
+
+    if not is_govt_verified:
         log_audit(mobile, "claim_blocked", "Unverified user attempted to submit a claim")
         flash("Please complete government identity verification before submitting claims.", "danger")
         return redirect(url_for('user.profile'))
 
-    if "bill" not in request.files:
-        flash("No document uploaded", "danger")
-        return redirect(url_for('user.claim_request'))
+    bills = request.files.getlist("bills")
+    if not bills or len(bills) == 0 or (len(bills) == 1 and bills[0].filename == ''):
+        # Fallback for old templates
+        if "bill" in request.files and request.files["bill"].filename != '':
+            bills = [request.files["bill"]]
+        else:
+            flash("No document uploaded", "danger")
+            return redirect(url_for('user.claim_request'))
 
-    file = request.files["bill"]
-    service = ClaimProcessingService(mobile, request.form, file)
+    service = ClaimProcessingService(mobile, request.form, bills)
 
     try:
         result = service.process_claim()
@@ -59,6 +75,46 @@ def submit_claim():
             flash("Claim submitted successfully for officer review.", "success")
     except Exception as e:
         flash(f"Error processing claim: {str(e)}", "danger")
+
+    return redirect(url_for('user.claim_status'))
+
+
+@user_bp.route("/edit_claim/<claim_id>", methods=["GET", "POST"])
+@role_required("user")
+def edit_claim(claim_id):
+    mobile = session["mobile"]
+    claim = claims_collection.find_one({"claim_id": claim_id, "mobile": mobile})
+    
+    if not claim:
+        flash("Claim not found.", "danger")
+        return redirect(url_for("user.claim_status"))
+        
+    if normalize_claim_status(claim.get("status")) != "Hold":
+        flash("Only claims on Hold can be edited.", "warning")
+        return redirect(url_for("user.claim_status"))
+        
+    if request.method == "GET":
+        return render_template("edit_claim.html", claim=claim)
+        
+    # POST
+    bills = request.files.getlist("bills")
+    # If no new files provided, we might still want to update other details.
+    # The simplest logic is to run the processing service again with whatever they uploaded, 
+    # or fallback to their existing files if nothing new is provided.
+    # To avoid complicating the OCR engine, we mandate uploading the corrected bill.
+    if not bills or len(bills) == 0 or (len(bills) == 1 and bills[0].filename == ''):
+        flash("Please upload the corrected documents to proceed.", "warning")
+        return render_template("edit_claim.html", claim=claim)
+        
+    service = ClaimProcessingService(mobile, request.form, bills, claim_id=claim_id)
+    try:
+        result = service.process_claim()
+        if not result.get("ok"):
+            flash(result.get("message", "Unable to update claim."), "danger")
+            return render_template("edit_claim.html", claim=claim)
+        flash("Claim updated and resubmitted successfully for officer review.", "success")
+    except Exception as e:
+        flash(f"Error updating claim: {str(e)}", "danger")
 
     return redirect(url_for('user.claim_status'))
 
@@ -95,11 +151,13 @@ def profile():
         from database.user_repository import get_user_by_mobile
         user = get_user_by_mobile(mobile) or {}
 
-    from database.govt_repository import get_employee_by_employee_id, get_employee_by_mobile
+    from database.govt_repository import get_employee_by_aadhaar, get_employee_by_mobile, get_employee_by_ppo
 
     employee = None
-    if user.get("employee_id"):
-        employee = get_employee_by_employee_id(user.get("employee_id"))
+    if user.get("ppo_number"):
+        employee = get_employee_by_ppo(user.get("ppo_number"))
+    if not employee and user.get("aadhaar_number"):
+        employee = get_employee_by_aadhaar(user.get("aadhaar_number"))
     if not employee:
         employee = get_employee_by_mobile(mobile)
 
@@ -112,13 +170,124 @@ def profile():
         "rejected_count": len([c for c in claims if normalize_claim_status(c['status']) == 'Rejected'])
     }
     safe_employee = employee or {}
-    return render_template("profile.html", mobile=mobile, employee=safe_employee, user=user, **stats)
+    profile_data = build_pensioner_profile(safe_employee or user)
+    documents = list_owner_documents(str(user.get("ppo_number") or mobile))
+    return render_template("profile.html", mobile=mobile, employee=safe_employee, user=user, profile_data=profile_data, documents=documents, **stats)
+
+
+@user_bp.route("/profile/update", methods=["POST"])
+@role_required("user")
+def update_profile():
+    mobile = session.get("mobile") or session.get("user_id")
+    if not mobile:
+        flash("Profile not found", "warning")
+        return redirect(url_for("auth.login"))
+
+    updates = {
+        "email": request.form.get("email"),
+        "phone": request.form.get("phone"),
+        "address": {
+            "doorNo": request.form.get("doorNo"),
+            "street": request.form.get("street"),
+            "area": request.form.get("area"),
+            "village": request.form.get("village"),
+            "taluk": request.form.get("taluk"),
+            "city": request.form.get("city"),
+            "district": request.form.get("district"),
+            "state": request.form.get("state"),
+            "pincode": request.form.get("pincode"),
+        },
+        "medical": {
+            "bloodGroup": request.form.get("bloodGroup"),
+            "history": [item.strip() for item in request.form.get("medicalHistory", "").split(",") if item.strip()],
+            "disabilities": request.form.get("disabilities"),
+            "allergies": request.form.get("allergies"),
+        },
+        "emergency": {
+            "name": request.form.get("emergencyName"),
+            "relationship": request.form.get("emergencyRelationship"),
+            "phone": request.form.get("emergencyPhone"),
+        },
+        "settings": {
+            "language": request.form.get("language") or "English",
+            "notifications": request.form.get("notifications") == "on",
+            "theme": request.form.get("theme") or "light",
+        },
+    }
+    update_doc = {}
+    for key, value in updates.items():
+        if isinstance(value, dict):
+            # Only include nested dicts that have at least one non-None, non-empty value
+            filtered = {k: v for k, v in value.items() if v not in (None, "")}
+            if filtered:
+                update_doc[key] = filtered
+        elif value not in (None, "", {}, []):
+            update_doc[key] = value
+    update_doc["updatedAt"] = update_doc["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    query = {"$or": [{"auth.phone": str(mobile)}, {"phone": str(mobile)}, {"mobile": str(mobile)}]}
+    if request.form.get("email"):
+        query["$or"].append({"auth.email": request.form.get("email").strip().lower()})
+    result = govt_collection.update_one(query, {"$set": update_doc}, upsert=False)
+    if result.matched_count == 0:
+        # User may be in the legacy users collection instead of govtlist
+        users_collection.update_one(query, {"$set": update_doc}, upsert=False)
+    flash("Profile updated successfully.", "success")
+    return redirect(url_for("user.profile"))
+
+
+@user_bp.route("/documents", methods=["GET", "POST"])
+@role_required("user")
+def document_center():
+    owner_id = str(session.get("user_id") or session.get("mobile"))
+    if request.method == "POST":
+        document_type = request.form.get("document_type")
+        file_obj = request.files.get("file")
+        if not document_type or not file_obj:
+            flash("Please choose a document and file.", "danger")
+            return redirect(url_for("user.document_center"))
+        record = upload_owner_document(owner_id, document_type, file_obj, Config.SUPABASE_BILL_BUCKET)
+        flash(f"{document_type} uploaded successfully.", "success")
+        log_audit(owner_id, "document_upload", f"Uploaded {document_type}", record)
+        return redirect(url_for("user.document_center"))
+
+    documents = list_owner_documents(owner_id)
+    return render_template("document_center.html", documents=documents)
+
+
+@user_bp.route("/documents/delete/<document_type>", methods=["POST"])
+@role_required("user")
+def delete_document(document_type):
+    owner_id = str(session.get("user_id") or session.get("mobile"))
+    delete_owner_document(owner_id, document_type)
+    flash("Document removed.", "success")
+    return redirect(url_for("user.document_center"))
+
+
+@user_bp.route("/know-your-claims")
+@role_required("user")
+def know_your_claims():
+    query = request.args.get("q", "")
+    results = search_claims_knowledge(query, k=10) if query else search_claims_knowledge("reimbursement treatment entitlement", k=10)
+    filters = {
+        "treatment": request.args.get("treatment", ""),
+        "department": request.args.get("department", ""),
+        "hospital_category": request.args.get("hospital_category", ""),
+        "coverage_amount": request.args.get("coverage_amount", ""),
+    }
+    return render_template("know_your_claims.html", results=results, query=query, filters=filters)
+
+
+@user_bp.route("/api/know-your-claims")
+@role_required("user")
+def know_your_claims_api():
+    query = request.args.get("q", "")
+    return jsonify({"results": search_claims_knowledge(query, k=10) if query else search_claims_knowledge("reimbursement treatment entitlement", k=10)})
 
 @user_bp.route("/api/hospitals")
 def get_hospitals_api():
     hospitals = get_all_hospitals()
-    # Return minimal data for the dropdown
-    return [{"name": h["name"], "network": h.get("network", True)} for h in hospitals]
+    return jsonify([{"name": h["name"], "network": h.get("network", True)} for h in hospitals])
 
 @user_bp.route("/download_letter/<claim_id>")
 @role_required("user")

@@ -14,6 +14,8 @@ class Config:
     SUPABASE_URL = settings.supabase_url
     SUPABASE_API_KEY = settings.supabase_api_key
     SUPABASE_SECRET_KEY = settings.supabase_secret_key
+    SUPABASE_SERVICE_ROLE_KEY = settings.supabase_secret_key
+    SUPABASE_DB_URL = settings.supabase_db_url
     SUPABASE_BILL_BUCKET = settings.supabase_bill_bucket
     SUPABASE_LETTER_BUCKET = settings.supabase_letter_bucket
     OCR_SPACE_API_KEY = settings.ocr_space_api_key

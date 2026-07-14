@@ -41,7 +41,7 @@
                     <a href="{{ url_for('auth.logout') }}" class="nav-pill"><i class="fa-solid fa-right-from-bracket"></i></a>
                 {% else %}
                     <a href="{{ url_for('auth.login') }}" class="nav-link">Login</a>
-                    <a href="{{ url_for('auth.register_page') }}" class="nav-link">Register</a>
+                    <a href="{{ url_for('auth.request_access_page') }}" class="nav-link">Request Access</a>
                 {% endif %}
                 {% if session.get('authenticated') %}
                 <div class="nav-meta">

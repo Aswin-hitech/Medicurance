@@ -41,8 +41,8 @@ Date: {current_date}
 To:
 {beneficiary_name}
 
-Employee ID:
-{employee_id}
+PPO Number:
+{ppo_number}
 
 Subject:
 Medical Reimbursement Claim Decision — {claim_id}

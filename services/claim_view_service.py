@@ -13,6 +13,20 @@ def _as_float(value: Any, default: float = 0.0) -> float:
         return default
 
 
+def _default_rag_result() -> Dict[str, Any]:
+    return {
+        "status": "Pending Review",
+        "eligible": False,
+        "confidence": 0.0,
+        "similarity_score": 0.0,
+        "source_document": "Annexure I / Annexure IA",
+        "matched_rule": "Rule retrieval is pending for this claim.",
+        "llm_explanation": "Government rule retrieval is pending because the vector index is not ready yet.",
+        "reasoning": "Government rule retrieval is pending because the vector index is not ready yet.",
+        "fraud_flags": [],
+    }
+
+
 def claim_metrics(claim: Dict[str, Any]) -> Dict[str, Any]:
     trust_result = claim.get("trust_result") or {}
     ai_result = claim.get("ai_result") or {}
@@ -128,6 +142,16 @@ def enrich_claim_for_view(claim: Dict[str, Any]) -> Dict[str, Any]:
     enriched["timeline"] = claim_timeline(enriched)
     enriched["ai_reasoning_summary"] = claim_explanation(enriched)
     enriched["letter_reference"] = enriched.get("letter_reference") or enriched["metrics"]["reference_number"]
+    rag_result = dict(enriched.get("rag_result") or {})
+    for key, value in _default_rag_result().items():
+        rag_result.setdefault(key, value)
+    if not rag_result.get("matched_rule"):
+        rag_result["matched_rule"] = "Rule retrieval is pending for this claim."
+    if not rag_result.get("llm_explanation"):
+        rag_result["llm_explanation"] = "Government rule retrieval is pending because the vector index is not ready yet."
+    if not rag_result.get("reasoning"):
+        rag_result["reasoning"] = rag_result["llm_explanation"]
+    enriched["rag_result"] = rag_result
     return enriched
 
 
