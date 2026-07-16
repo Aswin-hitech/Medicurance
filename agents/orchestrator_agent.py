@@ -24,6 +24,12 @@ class OrchestratorAgent:
             result_memory.status,
             float(result_memory.trust_result.get("score", result_memory.confidence_score) or 0.0),
         )
+        logger.info(
+            "[Orchestrator RAG] claim_id=%s | similarity=%.1f | eligible=%s",
+            result_memory.claim_id,
+            float(result_memory.policy_result.get("similarity_score", 0.0) or 0.0),
+            bool(result_memory.policy_result.get("eligible", False))
+        )
         return result_memory
 
     def coordinate(self, state: ClaimMemory | dict[str, Any]) -> ClaimMemory:

@@ -20,7 +20,7 @@ from config.settings import Config
 
 logger = logging.getLogger(__name__)
 
-OCR_SPACE_URL = "https://api.ocr.space/parse/image"
+OCR_SPACE_URL = Config.OCR_SPACE_URL
 
 
 # ─────────────────────────────────────────────

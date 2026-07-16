@@ -137,7 +137,7 @@ claim_versions_collection = db["claim_versions"]
 email_verifications_collection = db["email_verifications"]
 rag_chunks_collection = db["rag_chunks"]
 access_requests_collection = db["access_requests"]
-
+chat_history_collection = db["chat_history"]
 # Advanced Indexing
 if MONGO_AVAILABLE:
     _safe_create_index(users_collection, "mobile", unique=True)

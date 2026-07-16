@@ -26,7 +26,7 @@ class OtpService:
         if not Config.MSG91_API_KEY:
             return {"status": "skipped", "message": "No API key configured"}
 
-        url = "https://control.msg91.com/api/v5/sms"
+        url = Config.MSG91_API_URL
 
         payload = {
             "template_id": Config.MSG91_TEMPLATE_ID,

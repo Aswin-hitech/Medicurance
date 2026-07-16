@@ -58,7 +58,7 @@ def ask_llm(prompt, json_mode=False):
     response = None
     try:
         response = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
+            Config.GROQ_API_URL,
             headers=headers,
             json=data,
             timeout=30,

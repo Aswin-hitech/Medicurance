@@ -32,7 +32,7 @@ risk_level:
 ["LOW","MEDIUM","HIGH"]
 
 recommended_action:
-["Approve","Reject","Review"]
+["Approve","Reject","Review","Recommended"]
 
 Decision Logic:
 
@@ -48,6 +48,12 @@ Eligibility should consider:
 8. OCR confidence
 9. Trust score
 10. Government employee verification
+
+Scoring rule:
+
+- A specialty, procedure, or hospital match should increase the score rather than automatically making the claim eligible.
+- Mark the claim as "Eligible" only when the overall score is sufficient.
+- If the score clears the recommendation threshold, use "Recommended" as the action.
 
 Confidence Guidelines:
 

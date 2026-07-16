@@ -19,6 +19,18 @@ class Config:
     SUPABASE_BILL_BUCKET = settings.supabase_bill_bucket
     SUPABASE_LETTER_BUCKET = settings.supabase_letter_bucket
     OCR_SPACE_API_KEY = settings.ocr_space_api_key
+    GNANI_API_KEY_ID = getattr(settings, "gnani_api_key_id", "") or getattr(settings, "gnani_api_key", "")
+    GNANI_API_KEY = getattr(settings, "gnani_api_key", "") or getattr(settings, "gnani_api_key_id", "")
+    GNANI_BASE_URL = getattr(settings, "gnani_base_url", "https://api.vachana.ai")
+    GNANI_STT_URL = getattr(settings, "gnani_stt_url", "")
+    GNANI_TTS_URL = getattr(settings, "gnani_tts_url", "")
+    GNANI_TTS_PRODUCT = getattr(settings, "gnani_tts_product", "Gnani Timbre v2.0")
+    GNANI_TTS_MODEL = getattr(settings, "gnani_tts_model", "vachana-voice-v3")
+    GNANI_TTS_VOICE_TYPE = getattr(settings, "gnani_tts_voice_type", "Standard Voices")
+    GNANI_TTS_VOICE = getattr(settings, "gnani_tts_voice", "Pranav")
+    GNANI_LANGUAGE = getattr(settings, "gnani_language", "en-IN")
+    GNANI_VOICE = getattr(settings, "gnani_voice", "Pranav")
+    GNANI_AUDIO_FORMAT = getattr(settings, "gnani_audio_format", "wav")
     JWT_SECRET_KEY = settings.jwt_secret_key
     JWT_EXPIRATION = settings.jwt_expiration
     JWT_ACCESS_EXP_MINUTES = settings.jwt_access_exp_minutes
@@ -51,6 +63,12 @@ class Config:
     HOSPITAL_CACHE_TTL_SECONDS = settings.hospital_cache_ttl_seconds
     CLAIM_CACHE_TTL_SECONDS = settings.claim_cache_ttl_seconds
     ENABLE_BACKGROUND_JOBS = settings.enable_background_jobs
+    GROQ_API_URL = settings.groq_api_url
+    NHIS_START_URL = settings.nhis_start_url
+    NHIS_ALLOWED_NETLOCS = settings.nhis_allowed_netlocs_set
+    NHIS_ALLOWED_PREFIXES = settings.nhis_allowed_prefixes_tuple
+    OCR_SPACE_URL = settings.ocr_space_url
+    MSG91_API_URL = settings.msg91_api_url
 
     @classmethod
     def validate(cls):

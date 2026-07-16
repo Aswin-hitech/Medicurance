@@ -185,9 +185,20 @@ def render_letter_to_pdf(letter_text, claim, letter_type="officer_to_beneficiary
     pdf.cell(0, 8, str(letter_type).replace("_", " ").title(), 0, 1, "C")
     pdf.ln(4)
     pdf.set_font("Arial", size=11)
+    
+    def sanitize_for_fpdf(text):
+        replacements = {
+            '\u2011': '-', '\u2013': '-', '\u2014': '--',
+            '\u2018': "'", '\u2019': "'", '\u201c': '"', '\u201d': '"',
+            '\u2022': '-', '\u2026': '...', '\u00a0': ' '
+        }
+        for k, v in replacements.items():
+            text = text.replace(k, v)
+        return text.encode('latin-1', 'replace').decode('latin-1')
+
     for paragraph in str(letter_text).splitlines():
         if paragraph.strip():
-            pdf.multi_cell(0, 7, paragraph)
+            pdf.multi_cell(0, 7, sanitize_for_fpdf(paragraph))
         else:
             pdf.ln(2)
 

@@ -49,6 +49,19 @@ class AppSettings(BaseSettings):  # type: ignore[misc]
 
         ocr_space_api_key: str = Field(default="helloworld", alias="OCR_SPACE_API_KEY")
 
+        gnani_api_key_id: str = Field(default="", alias="GNANI_API_KEY_ID")
+        gnani_api_key: str = Field(default="", alias="GNANI_API_KEY")
+        gnani_base_url: str = Field(default="https://api.vachana.ai", alias="GNANI_BASE_URL")
+        gnani_stt_url: str = Field(default="", alias="GNANI_STT_URL")
+        gnani_tts_url: str = Field(default="", alias="GNANI_TTS_URL")
+        gnani_tts_product: str = Field(default="Gnani Timbre v2.0", alias="GNANI_TTS_PRODUCT")
+        gnani_tts_model: str = Field(default="vachana-voice-v3", alias="GNANI_TTS_MODEL")
+        gnani_tts_voice_type: str = Field(default="Standard Voices", alias="GNANI_TTS_VOICE_TYPE")
+        gnani_tts_voice: str = Field(default="Pranav", alias="GNANI_TTS_VOICE")
+        gnani_language: str = Field(default="en-IN", alias="GNANI_LANGUAGE")
+        gnani_voice: str = Field(default="Pranav", alias="GNANI_VOICE")
+        gnani_audio_format: str = Field(default="wav", alias="GNANI_AUDIO_FORMAT")
+
         jwt_secret_key: str = Field(default="", alias="JWT_SECRET_KEY")
         jwt_expiration: int = Field(default=86400, alias="JWT_EXPIRATION")
         jwt_access_exp_minutes: int = Field(default=15, alias="JWT_ACCESS_EXP_MINUTES")
@@ -88,6 +101,12 @@ class AppSettings(BaseSettings):  # type: ignore[misc]
         hospital_cache_ttl_seconds: int = Field(default=900, alias="HOSPITAL_CACHE_TTL_SECONDS")
         claim_cache_ttl_seconds: int = Field(default=300, alias="CLAIM_CACHE_TTL_SECONDS")
         enable_background_jobs: bool = Field(default=False, alias="ENABLE_BACKGROUND_JOBS")
+        groq_api_url: str = Field(default="https://api.groq.com/openai/v1/chat/completions", alias="GROQ_API_URL")
+        nhis_start_url: str = Field(default="https://tnnhis2018.in/TNEMPLOYEE/TNPolInfo.aspx", alias="NHIS_START_URL")
+        nhis_allowed_netlocs: str = Field(default="tnnhis2018.in,www.tnnhis2018.in", alias="NHIS_ALLOWED_NETLOCS")
+        nhis_allowed_prefixes: str = Field(default="/TNEMPLOYEE/,/TNEMPLOYEE/TNPolInfo.aspx", alias="NHIS_ALLOWED_PREFIXES")
+        ocr_space_url: str = Field(default="https://api.ocr.space/parse/image", alias="OCR_SPACE_URL")
+        msg91_api_url: str = Field(default="https://control.msg91.com/api/v5/sms", alias="MSG91_API_URL")
 
         model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -110,6 +129,18 @@ class AppSettings(BaseSettings):  # type: ignore[misc]
             self.supabase_bill_bucket = os.getenv("SUPABASE_BILL_BUCKET", "medical-bills")
             self.supabase_letter_bucket = os.getenv("SUPABASE_LETTER_BUCKET", "letters")
             self.ocr_space_api_key = os.getenv("OCR_SPACE_API_KEY", "helloworld")
+            self.gnani_api_key_id = os.getenv("GNANI_API_KEY_ID", "")
+            self.gnani_api_key = os.getenv("GNANI_API_KEY", self.gnani_api_key_id)
+            self.gnani_base_url = os.getenv("GNANI_BASE_URL", "https://api.vachana.ai")
+            self.gnani_stt_url = os.getenv("GNANI_STT_URL", "").strip()
+            self.gnani_tts_url = os.getenv("GNANI_TTS_URL", "").strip()
+            self.gnani_tts_product = os.getenv("GNANI_TTS_PRODUCT", "Gnani Timbre v2.0")
+            self.gnani_tts_model = os.getenv("GNANI_TTS_MODEL", "vachana-voice-v3")
+            self.gnani_tts_voice_type = os.getenv("GNANI_TTS_VOICE_TYPE", "Standard Voices")
+            self.gnani_tts_voice = os.getenv("GNANI_TTS_VOICE", "Pranav")
+            self.gnani_language = os.getenv("GNANI_LANGUAGE", "en-IN")
+            self.gnani_voice = os.getenv("GNANI_VOICE", "Pranav")
+            self.gnani_audio_format = os.getenv("GNANI_AUDIO_FORMAT", "wav")
             self.jwt_secret_key = os.getenv("JWT_SECRET_KEY") or self.secret_key
             self.jwt_expiration = _env_int("JWT_EXPIRATION", 86400)
             self.jwt_access_exp_minutes = _env_int("JWT_ACCESS_EXP_MINUTES", 15)
@@ -144,10 +175,24 @@ class AppSettings(BaseSettings):  # type: ignore[misc]
             self.hospital_cache_ttl_seconds = _env_int("HOSPITAL_CACHE_TTL_SECONDS", 900)
             self.claim_cache_ttl_seconds = _env_int("CLAIM_CACHE_TTL_SECONDS", 300)
             self.enable_background_jobs = _env_bool("ENABLE_BACKGROUND_JOBS", False)
+            self.groq_api_url = os.getenv("GROQ_API_URL", "https://api.groq.com/openai/v1/chat/completions")
+            self.nhis_start_url = os.getenv("NHIS_START_URL", "https://tnnhis2018.in/TNEMPLOYEE/TNPolInfo.aspx")
+            self.nhis_allowed_netlocs = os.getenv("NHIS_ALLOWED_NETLOCS", "tnnhis2018.in,www.tnnhis2018.in")
+            self.nhis_allowed_prefixes = os.getenv("NHIS_ALLOWED_PREFIXES", "/TNEMPLOYEE/,/TNEMPLOYEE/TNPolInfo.aspx")
+            self.ocr_space_url = os.getenv("OCR_SPACE_URL", "https://api.ocr.space/parse/image")
+            self.msg91_api_url = os.getenv("MSG91_API_URL", "https://control.msg91.com/api/v5/sms")
 
     @property
     def allowed_extensions_set(self) -> Set[str]:
         return {item.strip().lower() for item in str(self.file_allowed_extensions).split(",") if item.strip()}
+
+    @property
+    def nhis_allowed_netlocs_set(self) -> Set[str]:
+        return {item.strip() for item in str(self.nhis_allowed_netlocs).split(",") if item.strip()}
+
+    @property
+    def nhis_allowed_prefixes_tuple(self) -> tuple[str, ...]:
+        return tuple(item.strip() for item in str(self.nhis_allowed_prefixes).split(",") if item.strip())
 
     @property
     def fraud_weights(self) -> Dict[str, int]:
@@ -176,6 +221,13 @@ class AppSettings(BaseSettings):  # type: ignore[misc]
             raise EnvironmentError(
                 f"[MediCurance] STARTUP FAILED - Missing critical environment variables: {', '.join(missing)}"
             )
+        if not (self.gnani_api_key_id or self.gnani_api_key):
+            logger_msg = "[MediCurance] GNANI_API_KEY_ID/GNANI_API_KEY not set; voice features will be disabled."
+            try:
+                import logging
+                logging.getLogger(__name__).warning(logger_msg)
+            except Exception:
+                pass
         return True
 
 

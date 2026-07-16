@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}AI Pension Assistant - MediCurance{% endblock %}
+
+{% block head %}
+<!-- Inject Vite Chatbot assets -->
+<script>
+    window.csrfToken = "{{ csrf_token() }}";
+    window.userName = "{{ current_user.full_name | default(session.get('user_name', 'MediCurance User')) if current_user else session.get('user_name', 'MediCurance User') }}";
+</script>
+<link rel="stylesheet" href="{{ url_for('static', filename='chatbot/assets/index.css') }}">
+<style>
+    /* Hide the global navbar to match ChatGPT full-screen experience */
+    .navbar {
+        display: none !important;
+    }
+    /* Reset some shell styles that might conflict with the full-screen chat */
+    .page-shell {
+        padding: 0 !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        height: 100vh !important; /* Take full viewport height */
+        display: flex;
+        flex-direction: column;
+    }
+    #root {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+    }
+    /* Hide the global footer for a clean full-screen app feel */
+    .footer {
+        display: none !important;
+    }
+    body {
+        overflow: hidden !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="root"></div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" crossorigin src="{{ url_for('static', filename='chatbot/assets/index.js') }}"></script>
+{% endblock %}

@@ -519,7 +519,7 @@ def rag_validate(bill_text: str, entities: dict | None = None) -> dict:
     prompt = f"""You are an AI system auditing government medical reimbursement claims in India.
 Validate the medical bill strictly against the government scheme rules provided.
 
-CRITICAL INSTRUCTION: If even ONE chunk of the provided rules matches the procedure, condition, or hospital, you MUST mark the claim as "Eligible". Do not require all rules to match. A single strong match is sufficient for eligibility.
+CRITICAL INSTRUCTION: If a rule chunk matches the procedure, condition, specialty, or hospital, increase the score. Do not mark the claim as "Eligible" from a single match alone. Mark it as "Eligible" only when the overall score is sufficient. If the score crosses the recommendation threshold, set the action to "Recommended".
 
 GOVERNMENT SCHEME RULES:
 {context}
@@ -544,7 +544,7 @@ Return ONLY valid JSON with NO markdown and NO explanation:
   "missing_documents": ["<list of missing items>"],
   "fraud_flags": ["<list of detected fraud indicators>"],
   "reasoning": "<detailed explanation of eligibility decision and risk assessment>",
-  "recommended_action": "Approve" or "Reject" or "Review"
+  "recommended_action": "Approve" or "Reject" or "Review" or "Recommended"
 }}"""
 
     try:

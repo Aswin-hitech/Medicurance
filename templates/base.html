@@ -24,7 +24,10 @@
                     <small>Enterprise claims intelligence platform</small>
                 </span>
             </a>
-            <div class="navbar-menu">
+            <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+            <div class="navbar-menu" id="navbarMenu">
                 {% if session.get('authenticated') %}
                     {% if session.get('role') == 'admin' %}
                         <a href="{{ url_for('admin.dashboard') }}" class="nav-link"><i class="fa-solid fa-shield-halved"></i> Admin</a>
@@ -36,6 +39,7 @@
                         <a href="{{ url_for('user.dashboard') }}" class="nav-link"><i class="fa-solid fa-house"></i> Home</a>
                         <a href="{{ url_for('user.claim_request') }}" class="nav-link"><i class="fa-solid fa-file-circle-plus"></i> Claim</a>
                         <a href="{{ url_for('user.claim_status') }}" class="nav-link"><i class="fa-solid fa-layer-group"></i> Status</a>
+                        <a href="{{ url_for('user.faq') }}" class="nav-link"><i class="fa-solid fa-circle-question"></i> FAQ & Help</a>
                         <a href="{{ url_for('user.profile') }}" class="nav-link"><i class="fa-solid fa-user"></i> Profile</a>
                     {% endif %}
                     <a href="{{ url_for('auth.logout') }}" class="nav-pill"><i class="fa-solid fa-right-from-bracket"></i></a>
@@ -99,6 +103,14 @@
                     document.body.dataset.theme = document.body.dataset.theme === "dark" ? "light" : "dark";
                     localStorage.setItem(key, document.body.dataset.theme);
                     sync();
+                });
+            }
+
+            const mobileBtn = document.getElementById("mobileMenuBtn");
+            const navbarMenu = document.getElementById("navbarMenu");
+            if (mobileBtn && navbarMenu) {
+                mobileBtn.addEventListener("click", () => {
+                    navbarMenu.classList.toggle("active");
                 });
             }
         })();

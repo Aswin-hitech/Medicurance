@@ -30,6 +30,12 @@
                     <div><strong>Officer review</strong><p class="muted">Your claim is finalized by a human reviewer when needed.</p></div>
                 </div>
             </div>
+
+            <div class="card" style="margin-top:1.5rem; background: linear-gradient(135deg, #0a5bd3, #12a594); color: white; border: none; padding: 1.5rem; border-radius: 20px; box-shadow: 0 12px 32px rgba(10, 91, 211, 0.25);">
+                <h2 style="color: white; margin-bottom: 0.5rem;"><i class="fa-solid fa-sparkles"></i> Chat with AI for knowing more</h2>
+                <p style="color: rgba(255,255,255,0.9); font-size: 1.05rem; margin-bottom: 1.2rem;">Get instant answers about government rules, your claims, and eligibility criteria directly from our intelligent assistant.</p>
+                <a href="{{ url_for('user.chat') }}" class="btn" style="background: white; color: #0a5bd3; border-radius: 999px; padding: 0.75rem 1.5rem;">Open AI Assistant <i class="fa-solid fa-arrow-right"></i></a>
+            </div>
         </section>
 
         <aside class="hero-panel" style="background: var(--surface-strong);">
@@ -57,11 +63,6 @@
                     <h3>Document Center</h3>
                     <p class="muted">Upload and manage PPO, Aadhaar, PAN, and related records.</p>
                     <a href="{{ url_for('user.document_center') }}" class="btn btn-secondary w-100">Open documents</a>
-                </div>
-                <div class="insight-card">
-                    <h3>Know Your Claims</h3>
-                    <p class="muted">Search scheme coverage and required documents.</p>
-                    <a href="{{ url_for('user.know_your_claims') }}" class="btn btn-primary w-100">Search claims</a>
                 </div>
             </div>
 

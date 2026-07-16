@@ -143,14 +143,21 @@ def enrich_claim_for_view(claim: Dict[str, Any]) -> Dict[str, Any]:
     enriched["ai_reasoning_summary"] = claim_explanation(enriched)
     enriched["letter_reference"] = enriched.get("letter_reference") or enriched["metrics"]["reference_number"]
     rag_result = dict(enriched.get("rag_result") or {})
-    for key, value in _default_rag_result().items():
-        rag_result.setdefault(key, value)
-    if not rag_result.get("matched_rule"):
-        rag_result["matched_rule"] = "Rule retrieval is pending for this claim."
-    if not rag_result.get("llm_explanation"):
-        rag_result["llm_explanation"] = "Government rule retrieval is pending because the vector index is not ready yet."
-    if not rag_result.get("reasoning"):
-        rag_result["reasoning"] = rag_result["llm_explanation"]
+    processing_status = str(enriched.get("processing_status") or "").lower()
+    if processing_status != "completed":
+        for key, value in _default_rag_result().items():
+            rag_result.setdefault(key, value)
+        if not rag_result.get("matched_rule"):
+            rag_result["matched_rule"] = "Rule retrieval is pending for this claim."
+        if not rag_result.get("llm_explanation"):
+            rag_result["llm_explanation"] = "Government rule retrieval is pending because the vector index is not ready yet."
+        if not rag_result.get("reasoning"):
+            rag_result["reasoning"] = rag_result["llm_explanation"]
+    else:
+        # If completed but still falsy (e.g. empty string), provide empty defaults rather than 'pending'
+        rag_result.setdefault("matched_rule", "No direct rule match found.")
+        rag_result.setdefault("llm_explanation", "No specific government rule was retrieved for this claim.")
+        rag_result.setdefault("reasoning", rag_result.get("llm_explanation"))
     enriched["rag_result"] = rag_result
     return enriched
 

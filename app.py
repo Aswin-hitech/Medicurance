@@ -24,6 +24,7 @@ from blueprints.user import user_bp
 from blueprints.officer import officer_bp
 from blueprints.admin import admin_bp
 from blueprints.api import api_bp
+from blueprints.chat_api import chat_api_bp
 
 # Security & Session Settings
 app.config['SESSION_COOKIE_SECURE'] = Config.FLASK_ENV != "development"
@@ -46,6 +47,7 @@ app.register_blueprint(user_bp)
 app.register_blueprint(officer_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(api_bp)
+app.register_blueprint(chat_api_bp)
 
 register_error_handlers(app)
 
@@ -61,7 +63,8 @@ def _apply_security_headers(response):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    # Allow the chatbot page to request mic access; the browser still prompts the user.
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(self), geolocation=()"
     response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
     response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
     response.headers["Content-Security-Policy"] = (

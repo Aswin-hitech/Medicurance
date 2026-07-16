@@ -22,6 +22,27 @@ user_bp = Blueprint('user', __name__)
 def dashboard():
     return render_template("user_dashboard.html")
 
+@user_bp.route("/faq")
+@role_required("user")
+def faq():
+    return render_template("faq.html")
+
+@user_bp.route("/faq/download_annexure")
+@role_required("user")
+def download_annexure():
+    import os
+    path = os.path.join("resources", "annexures", "annexure_I.pdf")
+    if not os.path.exists(path):
+        flash("Annexure document is currently unavailable.", "warning")
+        return redirect(url_for("user.faq"))
+    return send_file(path, as_attachment=True, download_name="Annexure_I.pdf", mimetype="application/pdf")
+
+@user_bp.route("/chat")
+@role_required(["user", "officer", "admin"])
+def chat():
+    return render_template("chatbot.html")
+
+
 @user_bp.route("/claim_request")
 @role_required("user")
 def claim_request():
@@ -31,7 +52,7 @@ def claim_request():
 @role_required("user")
 @limit_route("10 per hour", redirect_endpoint="user.claim_request", message="Too many claim submissions. Please try again later.")
 def submit_claim():
-    mobile = session["mobile"]
+    mobile = session.get("mobile") or session.get("user_id")
 
     phone_digits = "".join(ch for ch in str(mobile or "") if ch.isdigit())
     govt_user = govt_collection.find_one({"$or": [{"auth.phone": phone_digits}, {"mobile": phone_digits}, {"phone": phone_digits}]})
@@ -82,7 +103,7 @@ def submit_claim():
 @user_bp.route("/edit_claim/<claim_id>", methods=["GET", "POST"])
 @role_required("user")
 def edit_claim(claim_id):
-    mobile = session["mobile"]
+    mobile = session.get("mobile") or session.get("user_id")
     claim = claims_collection.find_one({"claim_id": claim_id, "mobile": mobile})
     
     if not claim:
@@ -121,7 +142,7 @@ def edit_claim(claim_id):
 @user_bp.route("/claim_status")
 @role_required("user")
 def claim_status():
-    mobile = session["mobile"]
+    mobile = session.get("mobile") or session.get("user_id")
     page = max(int(request.args.get("page", 1)), 1)
     limit = min(max(int(request.args.get("limit", 25)), 1), 100)
     total_claims = claims_collection.count_documents({"mobile": mobile})
@@ -292,25 +313,12 @@ def get_hospitals_api():
 @user_bp.route("/download_letter/<claim_id>")
 @role_required("user")
 def download_letter(claim_id):
-    from services.letter_generator import generate_pdf_letter
-
-    claim = claims_collection.find_one({"claim_id": claim_id, "mobile": session["mobile"]})
+    claim = claims_collection.find_one({"claim_id": claim_id, "mobile": session.get("mobile") or session.get("user_id")})
     if not claim or normalize_claim_status(claim["status"]) == "Pending":
         flash("Letter not available.", "danger")
         return redirect(url_for('user.claim_status'))
         
-    action_type = "approval" if normalize_claim_status(claim["status"]) == "Approved" else "rejection"
-    
-    safe_type = str(action_type).replace("/", "_")
-    letter_info = claim.get("generated_letters", {}).get(safe_type, {})
-    if letter_info.get("url"):
-        return redirect(letter_info.get("url"))
-
-    pdf_path_or_url = generate_pdf_letter(claim, action_type)
-    if pdf_path_or_url.startswith("http"):
-        return redirect(pdf_path_or_url)
-    
-    return send_file(pdf_path_or_url, as_attachment=True, download_name=f"Claim_{claim_id[-8:]}_{action_type}.pdf")
+    return redirect(url_for('user.generate_letter', claim_id=claim_id, letter_type='officer_to_beneficiary', download=1))
 
 
 @user_bp.route("/generate_letter/<claim_id>/<letter_type>")
@@ -335,7 +343,7 @@ def generate_letter(claim_id, letter_type):
     if session.get("role") in {"officer", "admin"}:
         claim = claims_collection.find_one({"claim_id": claim_id})
     else:
-        claim = claims_collection.find_one({"claim_id": claim_id, "mobile": session["mobile"]})
+        claim = claims_collection.find_one({"claim_id": claim_id, "mobile": session.get("mobile") or session.get("user_id")})
 
     if not claim:
         flash("Letter not available.", "danger")
@@ -345,15 +353,20 @@ def generate_letter(claim_id, letter_type):
 
     safe_type = str(letter_type).replace("/", "_")
     letter_info = claim.get("generated_letters", {}).get(safe_type, {})
-    if letter_info.get("url"):
-        return redirect(letter_info.get("url"))
+    url_or_path = letter_info.get("url")
 
-    pdf_path_or_url = generate_pdf_letter(claim, letter_type)
-    if pdf_path_or_url.startswith("http"):
-        return redirect(pdf_path_or_url)
+    if not url_or_path or not (url_or_path.startswith("http") or __import__('os').path.exists(url_or_path)):
+        url_or_path = generate_pdf_letter(claim, letter_type)
+
+    if url_or_path.startswith("http"):
+        if request.args.get("download") == "1":
+            url_or_path = url_or_path.replace("download=false", "download=true")
+            if "download=" not in url_or_path:
+                url_or_path += "&download=true" if "?" in url_or_path else "?download=true"
+        return redirect(url_or_path)
 
     return send_file(
-        pdf_path_or_url,
+        url_or_path,
         as_attachment=request.args.get("download") == "1",
         download_name=f"Claim_{claim_id[-8:]}_{letter_type}.pdf",
         mimetype="application/pdf",

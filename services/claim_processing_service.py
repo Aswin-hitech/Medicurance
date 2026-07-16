@@ -101,22 +101,47 @@ class ClaimProcessingService:
         matches = retrieve_rules(query or extracted_text[:800], k=5) if extracted_text or query else []
         top_match = matches[0] if matches else {}
         similarity = round(float(top_match.get("confidence", 0) or 0) * 100, 1)
-        eligible = similarity >= 62
-        conditional = 48 <= similarity < 62
-        status = "Eligible" if eligible else "Conditional" if conditional else "Not Eligible"
+        specialty_boost = 0.0
+
+        if top_match:
+            match_text = " ".join(
+                str(value).lower()
+                for value in [
+                    entities.get("surgery"),
+                    entities.get("procedure"),
+                    entities.get("diagnosis"),
+                    entities.get("treatment"),
+                    entities.get("speciality"),
+                    entities.get("specialty"),
+                ]
+                if value
+            )
+            rule_text = str(top_match.get("matched_rule", "")).lower()
+            if match_text and any(token in rule_text for token in match_text.split()):
+                specialty_boost = 12.5
+            elif any(keyword in rule_text for keyword in ["specialty", "speciality", "procedure", "surgery", "treatment"]):
+                specialty_boost = 8.0
+
+        score = min(100.0, similarity + specialty_boost)
+        recommended = score >= 62
+        conditional = 48 <= score < 62
+        status = "Recommended" if recommended else "Conditional" if conditional else "Not Recommended"
         explanation = (
             f"The submitted claim details were compared with Annexure I and Annexure IA. "
             f"The closest government rule match is from {top_match.get('source_document', 'the annexure rules')} "
-            f"with {similarity}% similarity. The claim is marked {status.lower()} for officer verification."
+            f"with {similarity}% similarity. Specialty alignment contributed a {specialty_boost}% boost, "
+            f"bringing the score to {score}%. The claim is marked {status.lower()} for officer verification."
             if top_match
-            else "No close reimbursement rule match was found in Annexure I or Annexure IA. The claim is marked not eligible pending manual review."
+            else "No close reimbursement rule match was found in Annexure I or Annexure IA. The claim is marked not recommended pending manual review."
         )
         return {
-            "eligible": eligible,
+            "eligible": recommended,
             "status": status,
             "source_document": top_match.get("source_document", ""),
             "matched_rule": top_match.get("matched_rule", ""),
-            "similarity_score": similarity,
+            "similarity_score": score,
+            "base_similarity_score": similarity,
+            "specialty_boost": specialty_boost,
             "llm_explanation": explanation,
             "matches": matches,
         }

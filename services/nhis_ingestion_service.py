@@ -13,12 +13,13 @@ from urllib.parse import urljoin, urldefrag, urlparse
 import requests
 
 from services.rag_service import append_chunks_to_vector_db, save_rag_chunks_to_mongo, save_rag_chunks_to_supabase, _embedding_model
+from config.settings import Config
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_START_URL = "https://tnnhis2018.in/TNEMPLOYEE/TNPolInfo.aspx"
-ALLOWED_NETLOCS = {"tnnhis2018.in", "www.tnnhis2018.in"}
-ALLOWED_PREFIXES = ("/TNEMPLOYEE/", "/TNEMPLOYEE/TNPolInfo.aspx")
+DEFAULT_START_URL = Config.NHIS_START_URL
+ALLOWED_NETLOCS = Config.NHIS_ALLOWED_NETLOCS
+ALLOWED_PREFIXES = Config.NHIS_ALLOWED_PREFIXES
 MAX_PAGES = 120
 REQUEST_TIMEOUT = 30
 

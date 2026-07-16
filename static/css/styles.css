@@ -116,9 +116,11 @@ img, video {
     position: sticky;
     top: 0;
     z-index: 1000;
-    backdrop-filter: blur(18px);
-    background: rgba(8, 18, 39, 0.92);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    background: rgba(0, 0, 0, 0.85);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 }
 
 .navbar-container {
@@ -165,13 +167,27 @@ img, video {
     justify-content: flex-end;
 }
 
+.mobile-menu-btn {
+    display: none;
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0.5rem;
+}
+
 .nav-link,
 .nav-pill {
-    color: rgba(255, 255, 255, 0.92);
-    padding: 0.58rem 0.92rem;
+    color: rgba(255, 255, 255, 0.95);
+    padding: 0.65rem 1.15rem;
     border-radius: 999px;
     border: 1px solid transparent;
-    transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    font-family: 'Outfit', 'Inter', var(--font-main);
+    font-weight: 800;
+    font-size: 0.92rem;
+    letter-spacing: 0.03em;
 }
 
 .nav-link:hover,
@@ -753,7 +769,7 @@ footer.footer {
     text-align: center;
 }
 
-@media (max-width: 1040px) {
+@media (max-width: 1200px) {
     .hero-grid {
         grid-template-columns: 1fr;
     }
@@ -761,12 +777,27 @@ footer.footer {
 
 @media (max-width: 900px) {
     .navbar-container {
-        align-items: flex-start;
-        flex-direction: column;
+        align-items: center;
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .mobile-menu-btn {
+        display: block;
     }
 
     .navbar-menu {
-        justify-content: flex-start;
+        display: none;
+        width: 100%;
+        flex-direction: column;
+        align-items: flex-start;
+        padding-top: 1rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        margin-top: 0.5rem;
+    }
+
+    .navbar-menu.active {
+        display: flex;
     }
 }
 
