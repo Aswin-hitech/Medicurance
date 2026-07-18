@@ -30,7 +30,8 @@ from blueprints.chat_api import chat_api_bp
 app.config['SESSION_COOKIE_SECURE'] = Config.FLASK_ENV != "development"
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=1)
+app.config['WTF_CSRF_TIME_LIMIT'] = 3600  # 1 hour limit in seconds
 app.config['MAX_CONTENT_LENGTH'] = Config.UPLOAD_MAX_SIZE
 app.config["DEBUG"] = Config.FLASK_ENV == "development"
 app.config["SESSION_REFRESH_EACH_REQUEST"] = True

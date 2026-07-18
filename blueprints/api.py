@@ -226,6 +226,96 @@ def get_hospitals():
     return api_response(data={"hospitals": hospitals}, message="Hospitals loaded.", status_code=200)
 
 
+@api_bp.route("/scan_bills", methods=["POST"])
+@role_required("user")
+def scan_bills():
+    """
+    Receives uploaded bills, performs OpenCV preprocessing, runs OCR + entity extraction,
+    queries the hospital network status, and returns auto-population fields for the wizard.
+    """
+    import os
+    import tempfile
+    import uuid
+    from utils.security_utils import validate_file_upload
+    from services.ocr_service import extract_text_advanced
+    from services.entity_extractor import extract_entities
+    from database.hospital_repository import verify_hospital
+
+    files = request.files.getlist("bills")
+    if not files or len(files) == 0 or (len(files) == 1 and files[0].filename == ''):
+        return api_response(message="No bill files uploaded for scanning.", status_code=400, error="bad_request")
+
+    temp_paths = []
+    temp_dir = tempfile.gettempdir()
+    
+    # Track results
+    total_conf = 0.0
+    extracted_texts = []
+    page_count = 0
+
+    try:
+        # 1. Validate and save files locally
+        for file_obj in files:
+            is_valid, error, sanitized_filename = validate_file_upload(file_obj)
+            if not is_valid:
+                return api_response(message=f"Validation failed: {error}", status_code=400, error="validation_failed")
+            
+            t_path = os.path.join(temp_dir, f"{uuid.uuid4().hex}_{sanitized_filename}")
+            file_obj.save(t_path)
+            temp_paths.append(t_path)
+
+        # 2. Process each file via OCR
+        for path in temp_paths:
+            ocr_res = extract_text_advanced(path)
+            if ocr_res.get("text"):
+                extracted_texts.append(ocr_res["text"])
+            total_conf += ocr_res.get("ocr_confidence", 0.0)
+            page_count += ocr_res.get("page_count", 0)
+
+        combined_text = "\n\n".join(extracted_texts).strip()
+        avg_confidence = round(total_conf / len(temp_paths), 1) if temp_paths else 0.0
+
+        # 3. Extract medical entities
+        entities = extract_entities(combined_text)
+
+        # 4. Hospital Database Verification
+        if entities.get("hospital_name"):
+            h_check = verify_hospital(entities["hospital_name"])
+            if h_check.get("exists") and h_check.get("name"):
+                entities["hospital_name"] = h_check["name"]
+                entities["hospital_verified"] = h_check.get("verified", True)
+                entities["hospital_network"] = h_check.get("network", False)
+            else:
+                entities["hospital_verified"] = False
+                entities["hospital_network"] = False
+        else:
+            entities["hospital_verified"] = False
+            entities["hospital_network"] = False
+
+        return api_response(
+            data={
+                "entities": entities,
+                "ocr_confidence": avg_confidence,
+                "page_count": page_count,
+            },
+            message="Document scan and entity extraction completed successfully.",
+            status_code=200
+        )
+
+    except Exception as exc:
+        logger.error(f"[API.scan_bills] Extraction failed: {exc}", exc_info=True)
+        return api_response(message=f"Failed to scan bills: {str(exc)}", status_code=500, error="internal_error")
+
+    finally:
+        # Cleanup temporary files
+        for path in temp_paths:
+            if path and os.path.exists(path):
+                try:
+                    os.remove(path)
+                except Exception:
+                    pass
+
+
 @api_bp.route("/openapi.json", methods=["GET"])
 def openapi_spec():
     if not Config.API_DOCS_ENABLED:

@@ -4,6 +4,26 @@
 
 {% block content %}
 <div class="hero-shell animate-in">
+    {% if not is_assigned_to_me %}
+    <div id="assignmentBanner" class="card" style="background: var(--surface-strong); border: 2px solid var(--primary); padding: 1.5rem 2rem; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 280px;">
+            <h2 style="font-size: 1.25rem; margin: 0 0 0.25rem 0; color: var(--primary);"><i class="fa-solid fa-circle-question"></i> Are you verifying this claim?</h2>
+            <p class="muted" style="margin: 0; font-size: 0.95rem;">You must assign this claim to yourself before executing verify actions.</p>
+        </div>
+        <div style="display: flex; gap: 0.75rem; align-items: center;">
+            <form action="{{ url_for('officer.assign_claim', claim_id=claim.claim_id) }}" method="POST" style="margin: 0;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-primary" style="padding: 0.75rem 2rem;">
+                    Yes
+                </button>
+            </form>
+            <button class="btn btn-secondary" onclick="document.getElementById('assignmentBanner').style.display='none';" style="padding: 0.75rem 2rem;">
+                Review Only
+            </button>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="panel-hero" style="margin-bottom:1rem;">
         <div>
             <span class="hero-topline"><i class="fa-solid fa-user-shield"></i> Officer review workspace</span>
@@ -42,33 +62,127 @@
             </div>
         </section>
 
-            <div class="card" style="margin-top:1rem; margin-bottom:0; background: var(--bg-elevated);">
-                <div class="toolbar">
-                    <h3 style="margin: 0;">Uploaded Documents</h3>
-                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                        {% if claim.bill_urls %}
-                            {% for url in claim.bill_urls %}
-                            <a href="{{ url }}" target="_blank" class="btn btn-secondary btn-sm"><i class="fa-solid fa-file"></i> Document {{ loop.index }}</a>
-                            {% endfor %}
-                        {% elif claim.bill_url %}
-                            <a href="{{ claim.bill_url }}" target="_blank" class="btn btn-secondary btn-sm"><i class="fa-solid fa-file"></i> Document 1</a>
-                        {% else %}
-                            <span class="muted">No documents available</span>
-                        {% endif %}
+        <section class="hero-panel" style="background: var(--surface-strong); display: flex; flex-direction: column; gap: 1rem;">
+            <!-- Pensioner Digital e-Health Card (Phase 7) -->
+            {% if ecard and ecard.front_url %}
+            <div class="card" style="margin-top:0; background: var(--bg-elevated); border-left: 4px solid var(--success); margin-bottom: 0;">
+                <h3 class="gov-section-title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <span><i class="fa-solid fa-id-card"></i> Pensioner e-Health Card</span>
+                    <span class="badge badge-approved" style="font-size: 0.65rem; padding: 0.15rem 0.45rem;">Active</span>
+                </h3>
+                
+                <div class="ecard-flip-container" onclick="this.classList.toggle('flipped')" style="width: 100%; height: 360px; cursor: pointer; margin-bottom: 0.75rem;">
+                    <div class="ecard-flip-inner">
+                        <div class="ecard-flip-front" style="background: transparent;">
+                            <img src="{{ ecard.front_url }}" alt="e-Health Card Front" style="width: 100%; height: 100%; object-fit: contain;">
+                        </div>
+                        <div class="ecard-flip-back" style="background: transparent;">
+                            <img src="{{ ecard.back_url }}" alt="e-Health Card Back" style="width: 100%; height: 100%; object-fit: contain;">
+                        </div>
                     </div>
+                </div>
+                <div class="toolbar" style="justify-content: flex-start; gap: 0.5rem; flex-wrap: wrap;">
+                    <a href="{{ ecard.pdf_url }}" target="_blank" class="btn btn-primary btn-sm"><i class="fa-solid fa-file-pdf"></i> Download PDF Card</a>
+                    <a href="{{ url_for('officer.verify_card', token=ecard.verification_token) }}" class="btn btn-secondary btn-sm"><i class="fa-solid fa-shield-halved"></i> Verify Card</a>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Generated Government Application (Phase 3) -->
+            {% if claim.generated_application and claim.generated_application.pdf_url %}
+            <div class="card" style="margin-top:0; background: var(--bg-elevated); border-left: 4px solid var(--primary); margin-bottom: 0;">
+                <h3 class="gov-section-title" style="margin-bottom: 0.75rem;"><i class="fa-solid fa-file-pdf"></i> Download Application</h3>
+                <div class="toolbar" style="justify-content: flex-start; gap: 0.5rem; flex-wrap: wrap;">
+                    <a href="{{ claim.generated_application.pdf_url }}" target="_blank" class="btn btn-primary btn-sm"><i class="fa-solid fa-file-pdf"></i> Download PDF Application</a>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Uploaded Documents & Attachments (Phase 4) -->
+            <div class="card" style="margin-top:0; margin-bottom:0; background: var(--bg-elevated);">
+                <h3 class="gov-section-title"><i class="fa-solid fa-paperclip"></i> Uploaded Support Documents</h3>
+                <div style="display: grid; gap: 1rem; margin-top: 0.75rem;">
+                    <div>
+                        <strong style="font-size: 0.85rem; display: block; margin-bottom: 0.35rem;">Original Medical Bills:</strong>
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            {% if claim.bill_urls %}
+                                {% for url in claim.bill_urls %}
+                                <a href="{{ url }}" target="_blank" class="btn btn-secondary btn-sm"><i class="fa-solid fa-file-invoice-dollar"></i> Medical Bill {{ loop.index }}</a>
+                                {% endfor %}
+                            {% elif claim.bill_url %}
+                                <a href="{{ claim.bill_url }}" target="_blank" class="btn btn-secondary btn-sm"><i class="fa-solid fa-file-invoice-dollar"></i> Medical Bill 1</a>
+                            {% else %}
+                                <span class="muted">No bill documents available</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if claim.attachments %}
+                    <div>
+                        <strong style="font-size: 0.85rem; display: block; margin-bottom: 0.35rem;">Additional Support Attachments:</strong>
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            {% for key, urls in claim.attachments.items() %}
+                                {% if urls %}
+                                <a href="{{ urls[0] }}" target="_blank" class="btn btn-secondary btn-sm">
+                                    <i class="fa-solid fa-file-prescription"></i> {{ key|replace('_', ' ')|title }}
+                                </a>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </section>
         
         <aside class="hero-panel" style="background: var(--surface-strong);">
             <div class="card-header">
-                <div class="chip"><i class="fa-solid fa-scale-balanced"></i> AI insights</div>
-                <h2 style="margin-top:0.75rem;">Analysis highlights</h2>
+                <div class="chip"><i class="fa-solid fa-scale-balanced"></i> AI Insights</div>
+                <h2 style="margin-top:0.75rem;">Verification Report</h2>
             </div>
+
+            <!-- Advanced AI Verification Scores (Phase 5) -->
+            <div class="card" style="margin-top:1rem; background: var(--bg-elevated); border-left: 4px solid var(--primary);">
+                <h3><i class="fa-solid fa-robot" style="color: var(--primary);"></i> AI Verification Summary</h3>
+                <div style="display: grid; gap: 0.55rem; font-size: 0.88rem; margin-top: 0.75rem;">
+                    <div style="display:flex; justify-content:space-between;">
+                        <span>Eligibility Score:</span>
+                        <strong>{{ claim.recommendation.eligibility_score|default(claim.metrics.trust_score)|default(0.0) }}%</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between;">
+                        <span>Document Completeness:</span>
+                        <strong>{{ claim.recommendation.document_completeness_score|default(0.0) }}%</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between;">
+                        <span>Rule Matching Score:</span>
+                        <strong>{{ claim.recommendation.rule_matching_score|default(0.0) }}%</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between;">
+                        <span>Fraud Score:</span>
+                        <strong>{{ claim.recommendation.fraud_score|default(0.0) }}%</strong>
+                    </div>
+                    <hr style="border: 0; border-top: 1px solid var(--border); margin: 0.25rem 0;">
+                    <div>
+                        <strong>AI Recommendation:</strong>
+                        <p style="margin: 0.25rem 0 0; color: var(--primary); font-weight: 700;">
+                            {{ claim.recommendation.officer_recommendation|default('Review Details') }}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            {% if claim.recommendation.explainable_ai_summary %}
+            <div class="card" style="margin-top:1rem; background: var(--bg-elevated); border-left: 4px solid var(--accent);">
+                <h3><i class="fa-solid fa-brain" style="color: var(--accent);"></i> Explainable AI Summary</h3>
+                <p style="font-size: 0.82rem; line-height: 1.5; margin-top: 0.5rem; margin-bottom: 0;">
+                    {{ claim.recommendation.explainable_ai_summary }}
+                </p>
+            </div>
+            {% endif %}
             
             <div class="card" style="margin-top:1rem; background: var(--bg-elevated); border-left: 4px solid var(--success);">
-                <h3 style="color: var(--success);"><i class="fa-solid fa-circle-check"></i> Why this application seems true</h3>
-                <ul style="margin-top:0.5rem; padding-left:1.5rem;">
+                <h3 style="color: var(--success);"><i class="fa-solid fa-circle-check"></i> Positive Indicators</h3>
+                <ul style="margin-top:0.5rem; padding-left:1.25rem; font-size: 0.82rem;">
                     {% if claim.trust_result and claim.trust_result.reasoning %}
                         {% for reason in claim.trust_result.reasoning %}
                             {% if 'High duplicate' not in reason and 'unverified' not in reason %}
@@ -82,8 +196,8 @@
             </div>
             
             <div class="card" style="margin-top:1rem; background: var(--bg-elevated); border-left: 4px solid var(--danger);">
-                <h3 style="color: var(--danger);"><i class="fa-solid fa-circle-xmark"></i> Why this application seems fraud</h3>
-                <ul style="margin-top:0.5rem; padding-left:1.5rem;">
+                <h3 style="color: var(--danger);"><i class="fa-solid fa-circle-xmark"></i> Fraud & Risk Flags</h3>
+                <ul style="margin-top:0.5rem; padding-left:1.25rem; font-size: 0.82rem;">
                     {% if claim.fraud_result and claim.fraud_result.flags %}
                         {% for flag in claim.fraud_result.flags %}
                         <li>{{ flag }}</li>
@@ -122,67 +236,85 @@
     </div>
 
     {% if claim.status == 'Pending' %}
-    <div class="hero-grid" style="grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top:1rem;">
-        <form action="{{ url_for('officer.approve', claim_id=claim.claim_id) }}" method="POST" class="hero-panel" style="background: var(--surface-strong);">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <h3 class="gov-section-title"><i class="fa-solid fa-circle-check"></i> Approve</h3>
-            <div class="form-group">
-                <label class="form-label">Sanctioned amount</label>
-                <input type="number" name="sanctioned_amount" class="form-control" value="{{ claim.amount }}" step="0.01" min="0">
+        {% if is_assigned_to_me %}
+        <div class="hero-grid" style="grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top:1rem;">
+            <form action="{{ url_for('officer.approve', claim_id=claim.claim_id) }}" method="POST" class="hero-panel" style="background: var(--surface-strong);">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <h3 class="gov-section-title"><i class="fa-solid fa-circle-check"></i> Approve</h3>
+                <div class="form-group">
+                    <label class="form-label">Sanctioned amount</label>
+                    <input type="number" name="sanctioned_amount" class="form-control" value="{{ claim.amount }}" step="0.01" min="0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Quick note</label>
+                    <select class="form-control" onchange="document.getElementById('approvalNotes').value=this.value">
+                        <option value="">Select preset</option>
+                        <option>Claim approved after successful verification.</option>
+                        <option>All required documents verified and approved.</option>
+                        <option>Eligible under applicable reimbursement rules.</option>
+                        <option>Approved subject to policy conditions.</option>
+                    </select>
+                </div>
+                <textarea id="approvalNotes" name="notes" class="form-control" rows="5" placeholder="Official approval remarks" required></textarea>
+                <button class="btn btn-primary w-100" type="submit" style="margin-top:0.75rem;"><i class="fa-solid fa-file-signature"></i> Approve</button>
+            </form>
+            
+            <form action="{{ url_for('officer.hold_claim', claim_id=claim.claim_id) }}" method="POST" class="hero-panel" style="background: var(--surface-strong);">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <h3 class="gov-section-title"><i class="fa-solid fa-pause"></i> Hold</h3>
+                <div class="form-group">
+                    <label class="form-label">Wait for beneficiary action</label>
+                    <p class="muted" style="font-size:0.85rem; margin-bottom:0.5rem;">Allows the user to upload missing documents or edit claim details.</p>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Quick note</label>
+                    <select class="form-control" onchange="document.getElementById('holdNotes').value=this.value">
+                        <option value="">Select preset</option>
+                        <option>Please upload a clear, legible copy of the hospital bill.</option>
+                        <option>Missing discharge summary. Please upload to proceed.</option>
+                        <option>Hospital name mismatch. Please edit and select the correct hospital.</option>
+                        <option>Claim amount verification required.</option>
+                    </select>
+                </div>
+                <textarea id="holdNotes" name="reason" class="form-control" rows="5" placeholder="Tell the beneficiary what they need to fix or upload" required></textarea>
+                <button class="btn btn-warning w-100" type="submit" style="margin-top:0.75rem;"><i class="fa-solid fa-clock"></i> Place on Hold</button>
+            </form>
+ 
+            <form action="{{ url_for('officer.reject', claim_id=claim.claim_id) }}" method="POST" class="hero-panel" style="background: var(--surface-strong);">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <h3 class="gov-section-title"><i class="fa-solid fa-circle-xmark"></i> Reject</h3>
+                <div class="form-group">
+                    <label class="form-label">Reason</label>
+                    <select name="reason" class="form-control" required onchange="document.getElementById('rejectNotes').value=this.value">
+                        <option value="">Select reason</option>
+                        <option value="Invalid or incomplete document">Invalid or incomplete document</option>
+                        <option value="Duplicate claim detected">Duplicate claim detected</option>
+                        <option value="Procedure not covered under applicable rules">Procedure not covered under applicable rules</option>
+                        <option value="Benefit limit exceeded">Benefit limit exceeded</option>
+                        <option value="Government eligibility could not be verified">Government eligibility could not be verified</option>
+                    </select>
+                </div>
+                <textarea id="rejectNotes" name="comments" class="form-control" rows="5" placeholder="Detailed rejection comments and appeal guidance" required></textarea>
+                <button class="btn btn-danger w-100" type="submit" style="margin-top:0.75rem;"><i class="fa-solid fa-file-circle-xmark"></i> Reject</button>
+            </form>
+        </div>
+        {% else %}
+        <div class="card animate-in" style="text-align: center; padding: 3rem 2rem; margin-top: 1.5rem; border: 2px dashed var(--border); background: var(--surface);">
+            <div style="display: inline-flex; align-items: center; justify-content: center; width: 60px; height: 60px; border-radius: 50%; background: var(--primary-soft); color: var(--primary); margin-bottom: 1.5rem;">
+                <i class="fa-solid fa-lock" style="font-size: 1.8rem;"></i>
             </div>
-            <div class="form-group">
-                <label class="form-label">Quick note</label>
-                <select class="form-control" onchange="document.getElementById('approvalNotes').value=this.value">
-                    <option value="">Select preset</option>
-                    <option>Claim approved after successful verification.</option>
-                    <option>All required documents verified and approved.</option>
-                    <option>Eligible under applicable reimbursement rules.</option>
-                    <option>Approved subject to policy conditions.</option>
-                </select>
-            </div>
-            <textarea id="approvalNotes" name="notes" class="form-control" rows="5" placeholder="Official approval remarks" required></textarea>
-            <button class="btn btn-primary w-100" type="submit" style="margin-top:0.75rem;"><i class="fa-solid fa-file-signature"></i> Approve</button>
-        </form>
-        
-        <form action="{{ url_for('officer.hold_claim', claim_id=claim.claim_id) }}" method="POST" class="hero-panel" style="background: var(--surface-strong);">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <h3 class="gov-section-title"><i class="fa-solid fa-pause"></i> Hold</h3>
-            <div class="form-group">
-                <label class="form-label">Wait for beneficiary action</label>
-                <p class="muted" style="font-size:0.85rem; margin-bottom:0.5rem;">Allows the user to upload missing documents or edit claim details.</p>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Quick note</label>
-                <select class="form-control" onchange="document.getElementById('holdNotes').value=this.value">
-                    <option value="">Select preset</option>
-                    <option>Please upload a clear, legible copy of the hospital bill.</option>
-                    <option>Missing discharge summary. Please upload to proceed.</option>
-                    <option>Hospital name mismatch. Please edit and select the correct hospital.</option>
-                    <option>Claim amount verification required.</option>
-                </select>
-            </div>
-            <textarea id="holdNotes" name="reason" class="form-control" rows="5" placeholder="Tell the beneficiary what they need to fix or upload" required></textarea>
-            <button class="btn btn-warning w-100" type="submit" style="margin-top:0.75rem;"><i class="fa-solid fa-clock"></i> Place on Hold</button>
-        </form>
-
-        <form action="{{ url_for('officer.reject', claim_id=claim.claim_id) }}" method="POST" class="hero-panel" style="background: var(--surface-strong);">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <h3 class="gov-section-title"><i class="fa-solid fa-circle-xmark"></i> Reject</h3>
-            <div class="form-group">
-                <label class="form-label">Reason</label>
-                <select name="reason" class="form-control" required onchange="document.getElementById('rejectNotes').value=this.value">
-                    <option value="">Select reason</option>
-                    <option value="Invalid or incomplete document">Invalid or incomplete document</option>
-                    <option value="Duplicate claim detected">Duplicate claim detected</option>
-                    <option value="Procedure not covered under applicable rules">Procedure not covered under applicable rules</option>
-                    <option value="Benefit limit exceeded">Benefit limit exceeded</option>
-                    <option value="Government eligibility could not be verified">Government eligibility could not be verified</option>
-                </select>
-            </div>
-            <textarea id="rejectNotes" name="comments" class="form-control" rows="5" placeholder="Detailed rejection comments and appeal guidance" required></textarea>
-            <button class="btn btn-danger w-100" type="submit" style="margin-top:0.75rem;"><i class="fa-solid fa-file-circle-xmark"></i> Reject</button>
-        </form>
-    </div>
+            <h3 style="margin-bottom: 0.5rem;">Verification Actions Locked</h3>
+            <p class="muted" style="margin-bottom: 1.5rem; max-width: 500px; margin-left: auto; margin-right: auto;">
+                You are currently viewing this claim in **Review Only** mode. To approve, reject, or request changes, assign this claim to yourself.
+            </p>
+            <form action="{{ url_for('officer.assign_claim', claim_id=claim.claim_id) }}" method="POST" style="margin: 0; display: inline-block;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fa-solid fa-user-plus"></i> Assign Claim to Me
+                </button>
+            </form>
+        </div>
+        {% endif %}
     {% else %}
     <div class="card" style="margin-top:1rem;">
         <div class="toolbar">

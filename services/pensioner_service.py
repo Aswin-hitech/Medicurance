@@ -67,6 +67,7 @@ def build_pensioner_profile(employee: Dict[str, Any]) -> Dict[str, Any]:
         "settings": employee.get("settings", {}),
         "editable_fields": editable_fields,
         "last_updated": employee.get("updatedAt") or employee.get("updated_at"),
+        "ecard": employee.get("ecard", {}),
     }
 
 
@@ -100,6 +101,52 @@ def upload_owner_document(owner_id: str, document_type: str, file_storage, bucke
         "updated_at": _now(),
     }
     repo.save_document(record)
+
+    # Sync and update document link inside pensioner's MongoDB profile
+    try:
+        from database.mongo_client import govt_collection, users_collection
+        phone_digits = "".join(ch for ch in str(owner_id) if ch.isdigit())
+        query = {"$or": [
+            {"ppo_number": owner_id},
+            {"auth.ppoNumber": owner_id},
+            {"auth.phone": phone_digits},
+            {"mobile": phone_digits},
+            {"phone": phone_digits}
+        ]}
+        
+        update_doc = {
+            f"documents.{document_type}": {
+                "url": public_url,
+                "verified": False,
+                "uploadedAt": _now()
+            },
+            "updatedAt": _now()
+        }
+        
+        if document_type == "profilePhoto":
+            update_doc.update({
+                "profilePhoto": public_url,
+                "profile.profilePhoto": public_url,
+                "profile.photo_url": public_url,
+                "profile.photo": public_url
+            })
+            
+        govt_collection.update_one(query, {"$set": update_doc})
+        users_collection.update_one(query, {"$set": update_doc})
+        
+        # Auto-regenerate ecard if profile photo changes
+        if document_type == "profilePhoto":
+            try:
+                updated_profile = govt_collection.find_one(query) or users_collection.find_one(query)
+                if updated_profile:
+                    from services.ecard_generator import generate_and_save_ecard
+                    generate_and_save_ecard(owner_id, updated_profile)
+            except Exception as ecard_err:
+                logger.warning(f"[DocCenterPhoto] Auto e-card regeneration failed: {ecard_err}")
+                
+    except Exception as db_err:
+        logger.warning(f"[UploadDoc] Failed to sync document URL to MongoDB: {db_err}")
+
     return record
 
 
@@ -109,6 +156,35 @@ def delete_owner_document(owner_id: str, document_type: str):
     if doc and doc.get("storage_path"):
         delete_file(doc["storage_path"])
     repo.delete_document(owner_id, document_type)
+
+    # Remove reference from pensioner's MongoDB profile
+    try:
+        from database.mongo_client import govt_collection, users_collection
+        phone_digits = "".join(ch for ch in str(owner_id) if ch.isdigit())
+        query = {"$or": [
+            {"ppo_number": owner_id},
+            {"auth.ppoNumber": owner_id},
+            {"auth.phone": phone_digits},
+            {"mobile": phone_digits},
+            {"phone": phone_digits}
+        ]}
+        
+        unset_doc = {
+            f"documents.{document_type}": ""
+        }
+        if document_type == "profilePhoto":
+            unset_doc.update({
+                "profilePhoto": "",
+                "profile.profilePhoto": "",
+                "profile.photo_url": "",
+                "profile.photo": ""
+            })
+            
+        govt_collection.update_one(query, {"$unset": unset_doc})
+        users_collection.update_one(query, {"$unset": unset_doc})
+    except Exception as db_err:
+        logger.warning(f"[DeleteDoc] Failed to unsync document URL from MongoDB: {db_err}")
+
     return True
 
 

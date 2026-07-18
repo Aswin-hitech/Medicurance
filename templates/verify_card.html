@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Verify e-Health Card | MediCurance{% endblock %}
+
+{% block content %}
+<div class="hero-shell animate-in" style="max-width: 900px; margin: 0 auto; padding: 2rem;">
+    <div class="panel-hero" style="border-bottom: 2px solid var(--primary); padding-bottom: 1.5rem; margin-bottom: 2rem;">
+        <div>
+            <span class="hero-topline"><i class="fa-solid fa-shield-halved"></i> Security Verification</span>
+            <h1>MediCurance Digital e-Health Card Verified</h1>
+            <p class="muted">Cryptographically verified identity for Tamil Nadu Pensioners Health Scheme.</p>
+        </div>
+        <div class="toolbar">
+            <span class="badge badge-approved" style="font-size: 0.95rem; padding: 0.5rem 1rem;">
+                <i class="fa-solid fa-circle-check"></i> SIGNATURE VALID
+            </span>
+            <a href="{{ url_for('officer.dashboard') }}" class="btn btn-secondary btn-sm">Dashboard</a>
+        </div>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="section-grid" style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem;">
+        <!-- Left Column: Profile & Eligibility -->
+        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+            <!-- Profile Info Card -->
+            <div class="card" style="background: var(--surface-strong); padding: 1.5rem; border-radius: 8px;">
+                <h3 class="gov-section-title" style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="fa-solid fa-user-check" style="color: var(--primary);"></i> Beneficiary Profile
+                </h3>
+                <div style="display: flex; gap: 1.5rem; align-items: flex-start;">
+                    <!-- Photo Box -->
+                    <div style="width: 120px; height: 145px; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; background: var(--bg-elevated); display: flex; justify-content: center; align-items: center; flex-shrink: 0;">
+                        {% if profile_data.profile.photo_url or profile_data.profile.photo or profile_data.profilePhoto %}
+                            <img src="{{ profile_data.profilePhoto or profile_data.profile.photo_url or profile_data.profile.photo }}" alt="Beneficiary Photo" style="width: 100%; height: 100%; object-fit: cover;">
+                        {% else %}
+                            <i class="fa-solid fa-user-tie" style="font-size: 3rem; color: var(--muted);"></i>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Details Grid -->
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem 1.5rem; font-size: 0.9rem; flex-grow: 1;">
+                        <div>
+                            <span class="muted" style="display: block; font-size: 0.75rem; text-transform: uppercase;">Full Name</span>
+                            <strong>{{ profile_data.profile.fullName or 'N/A' }}</strong>
+                        </div>
+                        <div>
+                            <span class="muted" style="display: block; font-size: 0.75rem; text-transform: uppercase;">Unique Card ID</span>
+                            <strong>MC-{{ profile_data.auth.ppoNumber or 'N/A' }}</strong>
+                        </div>
+                        <div>
+                            <span class="muted" style="display: block; font-size: 0.75rem; text-transform: uppercase;">PPO Number</span>
+                            <strong>{{ profile_data.auth.ppoNumber or 'N/A' }}</strong>
+                        </div>
+                        <div>
+                            <span class="muted" style="display: block; font-size: 0.75rem; text-transform: uppercase;">Aadhaar (Masked)</span>
+                            <strong>XXXX XXXX {{ profile_data.identity.aadhaarLast4 or 'N/A' }}</strong>
+                        </div>
+                        <div>
+                            <span class="muted" style="display: block; font-size: 0.75rem; text-transform: uppercase;">Date of Birth</span>
+                            <span>{{ profile_data.profile.dob or 'N/A' }}</span>
+                        </div>
+                        <div>
+                            <span class="muted" style="display: block; font-size: 0.75rem; text-transform: uppercase;">Blood Group</span>
+                            <span>{{ profile_data.medical.bloodGroup or 'N/A' }}</span>
+                        </div>
+                        <div style="grid-column: 1 / -1;">
+                            <span class="muted" style="display: block; font-size: 0.75rem; text-transform: uppercase;">Retired Department</span>
+                            <span>{{ profile_data.pension.retiredDepartment or 'N/A' }} ({{ profile_data.pension.designation or 'N/A' }})</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hospital Eligibility Card -->
+            <div class="card" style="background: var(--surface-strong); border-left: 5px solid var(--success); padding: 1.5rem; border-radius: 8px;">
+                <h3 style="color: var(--success); margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; font-size: 1.15rem;">
+                    <i class="fa-solid fa-hospital-user"></i> Hospital Eligibility
+                </h3>
+                <p style="font-size: 1rem; font-weight: 600; margin: 0 0 0.5rem 0;">
+                    {{ hospital_eligibility }}
+                </p>
+                <p class="muted" style="font-size: 0.82rem; margin: 0;">
+                    This beneficiary is eligible for cashless hospitalization and treatment reimbursement under scheme regulations at all empanelled network hospitals in Tamil Nadu.
+                </p>
+            </div>
+
+            <!-- Active Claim History -->
+            <div class="card" style="background: var(--surface-strong); padding: 1.5rem; border-radius: 8px;">
+                <h3 class="gov-section-title" style="margin-bottom: 1rem;"><i class="fa-solid fa-history"></i> Claim History</h3>
+                {% if claims %}
+                <div style="display: grid; gap: 0.75rem;">
+                    {% for claim in claims[:5] %}
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.65rem; background: var(--bg-elevated); border-radius: 4px; border-left: 3px solid {% if claim.status == 'Approved' %}var(--success){% elif claim.status == 'Rejected' %}var(--danger){% else %}var(--primary){% endif %};">
+                        <div>
+                            <strong style="font-size: 0.88rem;">#{{ claim.claim_id[-8:] }}</strong>
+                            <span style="font-size: 0.75rem; color: var(--muted); margin-left: 0.5rem;">{{ claim.created_at or claim.date }}</span>
+                            <div class="muted" style="font-size: 0.8rem; margin-top: 0.15rem;">{{ claim.disease or 'Medical claim' }} — {{ claim.hospital or 'Network Hospital' }}</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <strong style="font-size: 0.9rem; color: var(--primary);">₹{{ claim.amount }}</strong>
+                            <div style="font-size: 0.75rem; font-weight: bold; margin-top: 0.15rem; color: {% if claim.status == 'Approved' %}var(--success){% elif claim.status == 'Rejected' %}var(--danger){% else %}var(--primary){% endif %};">
+                                {{ claim.status }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="muted" style="font-size: 0.88rem; text-align: center; margin: 1rem 0;">No claim records found for this beneficiary.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Right Column: Verification details -->
+        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+            <!-- Verification Metadata -->
+            <div class="card" style="background: var(--surface-strong); padding: 1.5rem; border-radius: 8px;">
+                <h3>Card Info</h3>
+                <div style="display: grid; gap: 0.75rem; font-size: 0.85rem; margin-top: 1rem;">
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 0.35rem;">
+                        <span class="muted">Card Status:</span>
+                        <strong style="color: var(--success);">ACTIVE</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 0.35rem;">
+                        <span class="muted">Issue Date:</span>
+                        <span>{{ issued_at[:10] if issued_at else '17-07-2026' }}</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; border-bottom: 1px solid var(--border); padding-bottom: 0.35rem;">
+                        <span class="muted">Govt. Verified:</span>
+                        <strong style="color: var(--primary);">YES</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between;">
+                        <span class="muted">District Treasury:</span>
+                        <span>{{ profile_data.pension.treasuryOffice or 'Chennai Central' }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Previous AI Trust Scores -->
+            <div class="card" style="background: var(--surface-strong); padding: 1.5rem; border-radius: 8px;">
+                <h3>AI Trust History</h3>
+                <p class="muted" style="font-size: 0.78rem; margin-bottom: 1rem;">Average verification scores from past claims.</p>
+                
+                {% if trust_scores %}
+                <div style="display: grid; gap: 0.75rem;">
+                    {% for score in trust_scores[:3] %}
+                    <div>
+                        <div style="display:flex; justify-content:space-between; font-size: 0.8rem; margin-bottom: 0.25rem;">
+                            <span>Claim #{{ score.claim_id[-8:] }}</span>
+                            <strong>{{ score.score }}%</strong>
+                        </div>
+                        <div style="height: 6px; background: var(--border); border-radius: 3px; overflow:hidden;">
+                            <div style="width: {{ score.score }}%; height: 100%; background: {% if score.score >= 85 %}var(--success){% elif score.score >= 60 %}var(--primary){% else %}var(--danger){% endif %};"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="muted" style="font-size: 0.8rem; text-align: center; margin: 1rem 0;">No trust history available.</p>
+                {% endif %}
+            </div>
+            
+            <!-- Quick Link to card downloads -->
+            {% if ecard.pdf_url %}
+            <div class="card" style="background: var(--surface-strong); padding: 1.25rem; border-radius: 8px; text-align: center;">
+                <p class="muted" style="font-size: 0.8rem; margin: 0 0 0.75rem 0;">Download digital e-card for offline use.</p>
+                <a href="{{ ecard.pdf_url }}" target="_blank" class="btn btn-secondary btn-sm" style="width: 100%;">
+                    <i class="fa-solid fa-file-pdf"></i> Download PDF Card
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -17,29 +17,69 @@ class ClaimProcessingService:
     def __init__(self, mobile, form_data, uploaded_files, claim_id=None):
         self.mobile = mobile
         self.form_data = form_data
-        self.uploaded_files = uploaded_files if isinstance(uploaded_files, list) else [uploaded_files]
-        self.temp_paths = []
+        
+        # Support dict of lists for attachments, or list of files (backward compatible)
+        if isinstance(uploaded_files, dict):
+            self.attachments = uploaded_files
+        else:
+            files_list = uploaded_files if isinstance(uploaded_files, list) else [uploaded_files]
+            self.attachments = {"bills": [f for f in files_list if f]}
+            
+        self.temp_paths = [] # List of temp bill paths for OCR pipeline (backward compatibility)
+        self.all_temp_paths = {} # Dict mapping attachment name -> list of temp paths
         self.claim_id = claim_id or str(uuid.uuid4())
         self.context = {}
         self.orchestrator = get_orchestrator_agent()
 
     def validate_upload(self):
         temp_dir = tempfile.gettempdir()
-        for file in self.uploaded_files:
+        
+        # 1. Process bills (populates self.temp_paths for backward compatibility)
+        self.temp_paths = []
+        for file in self.attachments.get("bills", []):
+            if not file:
+                continue
             is_valid, error, sanitized_filename = validate_file_upload(file)
             if not is_valid:
                 return False, f"{file.filename}: {error}"
             t_path = os.path.join(temp_dir, f"{uuid.uuid4().hex}_{sanitized_filename}")
             file.save(t_path)
             self.temp_paths.append(t_path)
+            
+        # 2. Process all attachments
+        self.all_temp_paths = {"bills": self.temp_paths}
+        for field_name, files in self.attachments.items():
+            if field_name == "bills":
+                continue
+            self.all_temp_paths[field_name] = []
+            for file in files:
+                if not file:
+                    continue
+                is_valid, error, sanitized_filename = validate_file_upload(file)
+                if not is_valid:
+                    return False, f"{file.filename}: {error}"
+                t_path = os.path.join(temp_dir, f"{uuid.uuid4().hex}_{sanitized_filename}")
+                file.save(t_path)
+                self.all_temp_paths[field_name].append(t_path)
+                
         return True, None
 
     def upload_document(self):
-        urls = []
-        for path in self.temp_paths:
-            url = upload_to_storage(path)
-            if url:
-                urls.append(url)
+        urls = {}
+        for field_name, paths in self.all_temp_paths.items():
+            urls[field_name] = []
+            for path in paths:
+                folder = "claims"
+                if field_name == "passport_photo":
+                    folder = "profile-images"
+                elif field_name in ["prescriptions", "discharge_summary", "investigation_reports", "certificates"]:
+                    folder = "medical-docs"
+                elif field_name in ["id_proof", "ppo_proof"]:
+                    folder = "identity-docs"
+                    
+                url = upload_to_storage(path, folder=folder)
+                if url:
+                    urls[field_name].append(url)
         return urls
 
     def run_ocr(self):
@@ -226,6 +266,8 @@ class ClaimProcessingService:
             "reasoning_summaries": payload.get("reasoning_summaries", {}),
             "intermediate_decisions": payload.get("intermediate_decisions", []),
             "workflow_metadata": payload.get("workflow_metadata", {}),
+            "generated_application": payload.get("generated_application"),
+            "attachments": payload.get("attachments"),
             "retries": payload.get("retries", {}),
             "errors": payload.get("errors", []),
         }
@@ -237,16 +279,96 @@ class ClaimProcessingService:
         log_claim_state(self.claim_id, "None", claim_doc["status"], self.mobile, "Claim submitted or updated")
         return claim_doc
 
+    def update_user_profile_photo(self, photo_url):
+        try:
+            from database.mongo_client import govt_collection, users_collection
+            phone_digits = "".join(ch for ch in str(self.mobile or "") if ch.isdigit())
+            query = {"$or": [{"auth.phone": phone_digits}, {"mobile": phone_digits}, {"phone": phone_digits}]}
+            
+            # Update in both govtlist and users collections
+            govt_collection.update_one(query, {"$set": {
+                "profilePhoto": photo_url,
+                "profile.profilePhoto": photo_url,
+                "profile.photo_url": photo_url,
+                "profile.photo": photo_url
+            }})
+            users_collection.update_one(query, {"$set": {
+                "profilePhoto": photo_url,
+                "profile.profilePhoto": photo_url,
+                "profile.photo_url": photo_url,
+                "profile.photo": photo_url
+            }})
+            logger.info("[ClaimProcessing] Updated profile photo url for mobile: %s", self.mobile)
+        except Exception as e:
+            logger.warning(f"[ClaimProcessing] Failed to update profile photo: {e}")
+
     def process_claim(self):
         is_valid, error = self.validate_upload()
         if not is_valid:
             return {"ok": False, "message": error, "claim_id": self.claim_id}
 
         try:
-            bill_urls = self.upload_document()
+            # 1. Upload files to storage (returns dict mapping field -> list of urls)
+            uploaded_urls = self.upload_document()
+            bill_urls = uploaded_urls.get("bills", [])
             if not bill_urls:
                 bill_urls = [p for p in self.temp_paths if p]
+
+            # 2. Extract new passport photo URL if uploaded
+            passport_photo_url = uploaded_urls.get("passport_photo", [None])[0] if uploaded_urls.get("passport_photo") else None
+            
+            # 3. Generate and upload official application documents (PDF, DOCX, HTML)
+            from services.government_application_generator import generate_and_upload_application
+            
+            claim_data = {k: v for k, v in self.form_data.items()}
+            # Associate attachment public URLs in claim_data
+            for key, urls in uploaded_urls.items():
+                if key != "bills" and key != "passport_photo" and urls:
+                    claim_data[key] = urls[0]
+            
+            # Fallback to existing photo if no new photo uploaded
+            if not passport_photo_url:
+                passport_photo_url = self.form_data.get("existing_passport_photo") or None
+            if not passport_photo_url:
+                try:
+                    from database.mongo_client import govt_collection, users_collection
+                    phone_digits = "".join(ch for ch in str(self.mobile or "") if ch.isdigit())
+                    query = {"$or": [{"auth.phone": phone_digits}, {"mobile": phone_digits}, {"phone": phone_digits}]}
+                    p_doc = govt_collection.find_one(query) or users_collection.find_one(query) or {}
+                    passport_photo_url = (
+                        p_doc.get("profilePhoto") or
+                        p_doc.get("profile", {}).get("profilePhoto") or
+                        p_doc.get("profile", {}).get("photo") or
+                        p_doc.get("profile", {}).get("photo_url") or
+                        (p_doc.get("documents", {}).get("profilePhoto", {}).get("url") if isinstance(p_doc.get("documents", {}).get("profilePhoto"), dict) else p_doc.get("documents", {}).get("profilePhoto"))
+                    )
+                except Exception as doc_err:
+                    logger.warning(f"[ClaimProcessingPhoto] Failed to resolve profile photo from DB: {doc_err}")
+            
+            gen_docs = generate_and_upload_application(self.claim_id, claim_data, photo_url=passport_photo_url)
+
+            # 4. If a new passport photo was uploaded, update the pensioner profile
+            if passport_photo_url:
+                self.update_user_profile_photo(passport_photo_url)
+                # Auto-regenerate e-Health card on profile photo update
+                try:
+                    from database.mongo_client import govt_collection, users_collection
+                    phone_digits = "".join(ch for ch in str(self.mobile or "") if ch.isdigit())
+                    query = {"$or": [{"auth.phone": phone_digits}, {"mobile": phone_digits}, {"phone": phone_digits}]}
+                    updated_profile = govt_collection.find_one(query) or users_collection.find_one(query)
+                    if updated_profile:
+                        from services.ecard_generator import generate_and_save_ecard
+                        generate_and_save_ecard(self.mobile, updated_profile)
+                except Exception as e:
+                    logger.warning(f"[ClaimPhotoUpdate] Auto e-card regeneration failed: {e}")
+
+            # 5. Build memory state and execute the AI agents pipeline
             workflow_memory = self.build_memory(bill_urls=bill_urls)
+            
+            # Link generated application files and extra attachments in memory form_data
+            workflow_memory.form_data["generated_application"] = gen_docs
+            workflow_memory.form_data["attachments"] = {k: v for k, v in uploaded_urls.items() if k != "bills"}
+            
             result_memory = self.orchestrator.execute(workflow_memory)
             claim_doc = self.persist_claim(result_memory.to_claim_document())
 
@@ -275,12 +397,26 @@ class ClaimProcessingService:
             self.cleanup()
 
     def cleanup(self):
+        # Clean all temporary paths recorded in dict
+        for field_name, paths in getattr(self, "all_temp_paths", {}).items():
+            for path in paths:
+                if path and os.path.exists(path):
+                    try:
+                        os.remove(path)
+                    except Exception:
+                        pass
+        # Fallback cleanup for temp_paths list
         for path in self.temp_paths:
             if path and os.path.exists(path):
                 try:
                     os.remove(path)
                 except Exception:
                     pass
+
+
+class ClaimProcessingError(Exception):
+    """Exception raised during claim processing flow."""
+    pass
 
 
 def process_claim_job(claim_id):

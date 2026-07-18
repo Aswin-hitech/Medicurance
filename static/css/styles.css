@@ -1,48 +1,48 @@
 :root {
-    --bg: #eef3f8;
-    --bg-elevated: #f8fbff;
-    --surface: rgba(255, 255, 255, 0.82);
+    --bg: #f4f4f4;
+    --bg-elevated: #ffffff;
+    --surface: #ffffff;
     --surface-strong: #ffffff;
-    --surface-soft: rgba(255, 255, 255, 0.64);
-    --surface-dark: #0f172a;
-    --text: #10233f;
-    --muted: #607089;
-    --border: rgba(107, 126, 151, 0.20);
-    --border-strong: rgba(16, 35, 63, 0.10);
-    --shadow: 0 24px 64px rgba(16, 35, 63, 0.12);
-    --shadow-soft: 0 12px 32px rgba(16, 35, 63, 0.08);
-    --primary: #0a5bd3;
-    --primary-strong: #083c8c;
-    --primary-soft: rgba(10, 91, 211, 0.10);
-    --accent: #12a594;
-    --success: #11845b;
-    --warning: #c47f00;
-    --danger: #c53030;
-    --info: #3168d3;
-    --radius: 20px;
-    --radius-sm: 14px;
-    --radius-lg: 28px;
+    --surface-soft: rgba(255, 255, 255, 0.85);
+    --surface-dark: #000000;
+    --text: #000000;
+    --muted: #6f6f6f;
+    --border: #e5e5e5;
+    --border-strong: #cccccc;
+    --shadow: 0 16px 36px rgba(0, 0, 0, 0.08);
+    --shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.04);
+    --primary: #1428a0;          /* Samsung Signature Blue */
+    --primary-strong: #0a1860;   /* Darker Blue */
+    --primary-soft: rgba(20, 40, 160, 0.06);
+    --accent: #000000;           /* Bold Black Accent */
+    --success: #22c55e;
+    --warning: #eab308;
+    --danger: #ef4444;
+    --info: #3b82f6;
+    --radius: 8px;               /* Samsung Minimalist Corners */
+    --radius-sm: 4px;
+    --radius-lg: 16px;
     --font-main: "Manrope", "Segoe UI", Arial, sans-serif;
     --font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
 }
 
 body[data-theme="dark"] {
-    --bg: #08101d;
-    --bg-elevated: #0c1527;
-    --surface: rgba(15, 23, 42, 0.78);
-    --surface-strong: #10192d;
-    --surface-soft: rgba(15, 23, 42, 0.56);
-    --surface-dark: #0b1120;
-    --text: #e5edf7;
-    --muted: #9daec5;
-    --border: rgba(148, 163, 184, 0.16);
-    --border-strong: rgba(226, 232, 240, 0.10);
-    --shadow: 0 24px 64px rgba(0, 0, 0, 0.30);
-    --shadow-soft: 0 12px 32px rgba(0, 0, 0, 0.22);
-    --primary: #58a6ff;
-    --primary-strong: #91c3ff;
-    --primary-soft: rgba(88, 166, 255, 0.14);
-    --accent: #44d7c8;
+    --bg: #000000;               /* Stark Black Background */
+    --bg-elevated: #121212;      /* Deep Dark Grey */
+    --surface: #121212;
+    --surface-strong: #181818;
+    --surface-soft: rgba(18, 18, 18, 0.85);
+    --surface-dark: #000000;
+    --text: #ffffff;
+    --muted: #a0a0a0;
+    --border: #2c2c2c;
+    --border-strong: #3e3e3e;
+    --shadow: 0 16px 36px rgba(0, 0, 0, 0.4);
+    --shadow-soft: 0 8px 24px rgba(0, 0, 0, 0.3);
+    --primary: #2189ff;          /* Vibrant Samsung Active Blue */
+    --primary-strong: #7cb7ff;
+    --primary-soft: rgba(33, 137, 255, 0.12);
+    --accent: #ffffff;
 }
 
 * {
@@ -60,24 +60,9 @@ html {
 body {
     margin: 0;
     font-family: var(--font-main);
-    background:
-        radial-gradient(circle at top left, rgba(10, 91, 211, 0.12), transparent 22rem),
-        radial-gradient(circle at top right, rgba(18, 165, 148, 0.12), transparent 20rem),
-        linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 26rem),
-        var(--bg);
+    background: var(--bg);
     color: var(--text);
     line-height: 1.6;
-}
-
-body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    background-image: linear-gradient(rgba(16, 35, 63, 0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(16, 35, 63, 0.018) 1px, transparent 1px);
-    background-size: 36px 36px;
-    mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.12), transparent 80%);
-    opacity: 0.35;
 }
 
 a {
@@ -86,10 +71,8 @@ a {
 }
 
 a:hover {
-    color: #ffffff;
-    text-shadow:
-        0 0 8px rgba(88, 166, 255, 0.62),
-        0 0 18px rgba(68, 215, 200, 0.30);
+    color: var(--primary-strong);
+    text-decoration: underline;
 }
 
 img, video {
@@ -324,52 +307,64 @@ p {
 .btn {
     appearance: none;
     border: 1px solid transparent;
-    border-radius: 14px;
-    padding: 0.82rem 1.1rem;
-    font-weight: 800;
-    line-height: 1;
+    border-radius: 50px;
+    padding: 1.05rem 2.2rem;
+    font-weight: 700;
+    font-size: 1rem;
+    line-height: 1.2;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.55rem;
-    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, border-color 0.18s ease;
-    box-shadow: 0 10px 24px rgba(16, 35, 63, 0.10);
+    gap: 0.65rem;
+    transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .btn:hover {
-    transform: translateY(-1px);
+    transform: scale(1.02);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, var(--primary), #1f79f0);
-    color: #fff;
+    background: var(--surface-dark);
+    color: var(--bg-elevated);
 }
 
 .btn-primary:hover {
+    background: var(--primary);
     color: #fff;
 }
 
 .btn-secondary {
-    background: rgba(107, 126, 151, 0.10);
+    background: transparent;
     color: var(--text);
-    border-color: var(--border);
+    border: 1px solid var(--text);
+}
+
+.btn-secondary:hover {
+    background: var(--text);
+    color: var(--bg-elevated);
 }
 
 .btn-danger {
-    background: linear-gradient(135deg, #e84545, #c53030);
+    background: var(--danger);
     color: #fff;
+}
+
+.btn-danger:hover {
+    background: #b91c1c;
 }
 
 .btn-outline {
     background: transparent;
-    color: #fff;
-    border-color: rgba(255, 255, 255, 0.24);
+    color: var(--text);
+    border: 1px solid var(--border-strong);
     box-shadow: none;
 }
 
 .btn-sm {
-    padding: 0.58rem 0.88rem;
+    padding: 0.65rem 1.4rem;
     font-size: 0.88rem;
 }
 
@@ -380,7 +375,7 @@ p {
 
 .btn[disabled],
 .btn.disabled {
-    opacity: 0.55;
+    opacity: 0.4;
     pointer-events: none;
 }
 
@@ -651,22 +646,24 @@ th {
 }
 
 .toast {
-    padding: 0.95rem 1rem;
-    border-radius: 18px;
-    border: 1px solid var(--border);
-    background: var(--surface-strong);
-    box-shadow: var(--shadow);
-    transition: opacity 0.25s ease, transform 0.25s ease;
+    padding: 1.2rem 1.5rem;
+    border-radius: 8px;           /* Clean geometric rounded corners */
+    border: 2px solid var(--surface-dark);
+    background: var(--bg-elevated);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+    position: relative;
+    overflow: hidden;
 }
 
-.toast-success { border-color: rgba(17, 132, 91, 0.26); }
-.toast-warning { border-color: rgba(196, 127, 0, 0.26); }
-.toast-danger { border-color: rgba(197, 48, 48, 0.26); }
-.toast-info { border-color: rgba(49, 104, 211, 0.26); }
+.toast-success { border-color: var(--success); }
+.toast-warning { border-color: var(--warning); }
+.toast-danger { border-color: var(--danger); }
+.toast-info { border-color: var(--info); }
 
 .toast.toast-hide {
     opacity: 0;
-    transform: translateY(-8px);
+    transform: translateX(100px);
     pointer-events: none;
 }
 
@@ -847,5 +844,81 @@ footer.footer {
         width: 100%;
         justify-items: center;
         text-align: center;
+    }
+}
+
+/* e-Health Card 3D Flip Animation (Phase 7) */
+.ecard-flip-container {
+    perspective: 1000px;
+}
+.ecard-flip-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.6s;
+    transform-style: preserve-3d;
+}
+.ecard-flip-container:hover .ecard-flip-inner,
+.ecard-flip-container.flipped .ecard-flip-inner {
+    transform: rotateY(180deg);
+}
+.ecard-flip-front, .ecard-flip-back {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.16);
+    border: 1px solid var(--border);
+    background: #fff;
+}
+.ecard-flip-back {
+    transform: rotateY(180deg);
+}
+
+/* Print styles for 2-page e-Health Card printing (Phase 7) */
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    .ecard-flip-container,
+    .ecard-flip-container * {
+        visibility: visible;
+    }
+    .ecard-flip-container {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        height: auto !important;
+        perspective: none !important;
+        box-shadow: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    .ecard-flip-inner {
+        transform: none !important;
+        transform-style: flat !important;
+        transition: none !important;
+    }
+    .ecard-flip-front,
+    .ecard-flip-back {
+        position: relative !important;
+        width: 480px !important;
+        height: 304px !important;
+        transform: none !important;
+        backface-visibility: visible !important;
+        -webkit-backface-visibility: visible !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        margin: 50px auto !important;
+        border: 2px solid #000 !important;
+        box-shadow: none !important;
+        display: block !important;
+    }
+    .ecard-flip-back {
+        transform: none !important;
     }
 }

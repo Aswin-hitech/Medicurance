@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Government of Tamil Nadu - Medical Reimbursement Application</title>
+    <style>
+        body {
+            font-family: "Segoe UI", Arial, sans-serif;
+            color: #1a202c;
+            line-height: 1.5;
+            margin: 0;
+            padding: 30px;
+            background: #fff;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            border: 1px solid #e2e8f0;
+            padding: 40px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #0a5bd3;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+            position: relative;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 22px;
+            text-transform: uppercase;
+            color: #0f172a;
+        }
+        .header h2 {
+            margin: 5px 0 0;
+            font-size: 14px;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+        }
+        .meta-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            color: #475569;
+            margin-bottom: 25px;
+        }
+        .photo-box {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 100px;
+            height: 100px;
+            border: 1px solid #cbd5e1;
+            background: #f8fafc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            color: #94a3b8;
+            overflow: hidden;
+        }
+        .photo-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .section-title {
+            background: #f1f5f9;
+            padding: 8px 12px;
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #0f172a;
+            border-left: 4px solid #0a5bd3;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+        .details-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px 20px;
+            font-size: 13px;
+        }
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+        }
+        .detail-label {
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 2px;
+        }
+        .detail-value {
+            color: #0f172a;
+            border-bottom: 1px dotted #cbd5e1;
+            padding-bottom: 2px;
+        }
+        .full-width {
+            grid-column: 1 / -1;
+        }
+        .checklist-list {
+            margin: 0;
+            padding-left: 20px;
+            font-size: 13px;
+        }
+        .checklist-list li {
+            margin-bottom: 4px;
+        }
+        .declaration-box {
+            background: #fafafa;
+            border: 1px solid #e2e8f0;
+            padding: 15px;
+            font-size: 12px;
+            color: #334155;
+            margin-top: 30px;
+            border-radius: 4px;
+            line-height: 1.6;
+        }
+        .signature-section {
+            margin-top: 40px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+        }
+        .sig-block {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .sig-line {
+            width: 180px;
+            border-top: 1px dashed #475569;
+            margin-top: 35px;
+            text-align: center;
+            padding-top: 5px;
+            color: #475569;
+        }
+        @media print {
+            body {
+                padding: 0;
+            }
+            .container {
+                border: none;
+                box-shadow: none;
+                padding: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Photo Box -->
+        <div class="photo-box">
+            
+                Passport Photo
+            
+        </div>
+
+        <!-- Header -->
+        <div class="header">
+            <h2>Government of Tamil Nadu</h2>
+            <h1>Medical Reimbursement Application</h1>
+            <h2>Under TN Pensioners Health Scheme 2026</h2>
+        </div>
+
+        <div class="meta-info">
+            <div><strong>Application Ref No:</strong> CLM-2026-999999</div>
+            <div><strong>Submission Date:</strong> 18 July 2026</div>
+        </div>
+
+        <!-- 1. Beneficiary Details -->
+        <div class="section-title">1. Beneficiary Details</div>
+        <div class="details-grid">
+            <div class="detail-item">
+                <span class="detail-label">Beneficiary Full Name</span>
+                <span class="detail-value">John Doe</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">PPO Number</span>
+                <span class="detail-value">PPO-1234567</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Aadhaar Card Number</span>
+                <span class="detail-value">1234-5678-9012</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Mobile Number</span>
+                <span class="detail-value">9876543210</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Email Address</span>
+                <span class="detail-value">johndoe@example.com</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Date of Birth</span>
+                <span class="detail-value">1960-05-15</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Date of Retirement</span>
+                <span class="detail-value">2020-05-31</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Pension Category</span>
+                <span class="detail-value">Civil Pensioner</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Department Retired From</span>
+                <span class="detail-value">Education Department</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Designation at Retirement</span>
+                <span class="detail-value">Headmaster</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Treasury Office</span>
+                <span class="detail-value">Chennai Central Treasury</span>
+            </div>
+            <div class="detail-item full-width">
+                <span class="detail-label">Residential Address</span>
+                <span class="detail-value">No. 42, Pensioners Avenue, Chennai - 600001</span>
+            </div>
+        </div>
+
+        <!-- 2. Treatment Details -->
+        <div class="section-title">2. Treatment Details</div>
+        <div class="details-grid">
+            <div class="detail-item">
+                <span class="detail-label">Patient Name</span>
+                <span class="detail-value">Jane Doe</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Relationship to Pensioner</span>
+                <span class="detail-value">Spouse</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Disease Name</span>
+                <span class="detail-value">Cardiac Ailment</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Diagnosis details</span>
+                <span class="detail-value">Severe Angina</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Surgery / Procedure Type</span>
+                <span class="detail-value">Angioplasty with Stent</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Treatment Category</span>
+                <span class="detail-value">Surgical</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Admission Date</span>
+                <span class="detail-value">2026-07-01</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Discharge Date</span>
+                <span class="detail-value">2026-07-05</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Treating Doctor</span>
+                <span class="detail-value">Dr. A. K. Smith</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Treating Hospital</span>
+                <span class="detail-value">Apollo Hospitals, Chennai</span>
+            </div>
+        </div>
+
+        <!-- 3. Claim Details -->
+        <div class="section-title">3. Claim & Financial Details</div>
+        <div class="details-grid">
+            <div class="detail-item">
+                <span class="detail-label">Claim Type</span>
+                <span class="detail-value">Reimbursement</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Claim Amount Claimed (INR)</span>
+                <span class="detail-value" style="font-weight: bold; color: #0a5bd3;">₹150000.00</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Previous Claims Submitted</span>
+                <span class="detail-value">1</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Previous Claim Ref No.</span>
+                <span class="detail-value">CLM-2025-111111</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Emergency Case?</span>
+                <span class="detail-value">No</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Treatment Period (Days)</span>
+                <span class="detail-value">4 Days</span>
+            </div>
+        </div>
+
+        <!-- 4. Bank Details -->
+        <div class="section-title">4. Beneficiary Bank Account Details</div>
+        <div class="details-grid">
+            <div class="detail-item">
+                <span class="detail-label">Bank Name</span>
+                <span class="detail-value">State Bank of India</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Branch Name</span>
+                <span class="detail-value">Adyar Branch</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Account Number</span>
+                <span class="detail-value">100012345678</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">IFSC Code</span>
+                <span class="detail-value">SBIN0001234</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">MICR Code</span>
+                <span class="detail-value">600002015</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Account Type</span>
+                <span class="detail-value">Savings</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">ECS Direct Credit Enabled?</span>
+                <span class="detail-value">Yes</span>
+            </div>
+        </div>
+
+        <!-- 5. Checklist -->
+        <div class="section-title">5. Support Document Checklist</div>
+        <ul class="checklist-list">
+            <li>Original Medical Bills: Attached</li>
+            <li>Doctor's Prescription: Attached</li>
+            <li>Hospital Discharge Summary: Attached</li>
+            
+            
+            
+            
+        </ul>
+
+        <!-- Declaration Section -->
+        <div class="declaration-box">
+            <strong>DECLARATION:</strong><br>
+            I hereby declare that the information furnished above is true and correct to the best of my knowledge. I understand that furnishing false information may result in rejection of my claim and legal action.
+        </div>
+
+        <!-- Signatures -->
+        <div class="signature-section">
+            <div class="sig-block">
+                <span style="font-weight: 600;">Date: 2026-07-10</span>
+            </div>
+            <div class="sig-block">
+                <span style="font-family: 'Courier New', Courier, monospace; font-size: 16px; font-weight: bold; letter-spacing: 1px;">John Doe</span>
+                <div class="sig-line">Signature of Beneficiary</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

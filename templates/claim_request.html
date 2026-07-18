@@ -4,88 +4,385 @@
 
 {% block content %}
 <div class="hero-shell animate-in">
-    <div class="panel-hero" style="margin-bottom:1rem;">
+    <!-- Hero / Title Area -->
+    <div class="panel-hero" style="margin-bottom:1.5rem;">
         <div>
-            <span class="hero-topline"><i class="fa-solid fa-file-circle-plus"></i> Claim intake</span>
-            <h1 style="margin-top:1rem;">Submit a reimbursement request</h1>
-            <p class="muted">Upload a bill, preview the file, and add officer notes in one streamlined flow.</p>
+            <span class="hero-topline"><i class="fa-solid fa-file-circle-plus"></i> Claim Intake Portal</span>
+            <h1 style="margin-top:0.75rem;">Digital Reimbursement Application</h1>
+            <p class="muted">Fill out the official multi-section form, upload attachments, scan bills, and submit for review.</p>
         </div>
-        <div class="metric-ring" style="--percent: 72%;">
-            <span>3 steps</span>
+        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem;">
+            <div class="metric-ring" style="--percent: 20%;" id="progressRing">
+                <span id="stepProgressText">Step 1/5</span>
+            </div>
+            <span class="badge badge-success" id="draftStatusBadge" style="display: none;"><i class="fa-solid fa-circle-check"></i> Draft Autosaved</span>
         </div>
     </div>
 
-    <div class="hero-grid" style="grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.7fr);">
-        <section class="hero-panel" style="background: var(--surface-strong);">
+    <!-- Wizard Step Tabs -->
+    <div class="segmented" style="margin-bottom: 2rem; justify-content: flex-start; display: flex; overflow-x: auto; padding-bottom: 0.5rem; gap: 0.5rem;">
+        <button type="button" class="btn btn-primary" id="tabBtn1" onclick="goToStep(1)">1. Beneficiary</button>
+        <button type="button" class="btn btn-secondary" id="tabBtn2" onclick="goToStep(2)">2. Treatment</button>
+        <button type="button" class="btn btn-secondary" id="tabBtn3" onclick="goToStep(3)">3. Claim</button>
+        <button type="button" class="btn btn-secondary" id="tabBtn4" onclick="goToStep(4)">4. Bank</button>
+        <button type="button" class="btn btn-secondary" id="tabBtn5" onclick="goToStep(5)">5. Attachments</button>
+    </div>
+
+    <!-- Main Wizard Frame -->
+    <div class="hero-grid" style="grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.6fr);">
+        <section class="hero-panel" style="background: var(--surface-strong); position: relative;">
             <form action="{{ url_for('user.submit_claim') }}" method="POST" enctype="multipart/form-data" id="claimForm">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));">
-                    <div class="form-group">
-                        <label class="form-label">Patient name</label>
-                        <input type="text" name="name" class="form-control" placeholder="Full name" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Claim amount</label>
-                        <input type="number" name="amount" class="form-control" placeholder="25000" min="1" step="0.01" required>
-                    </div>
-                </div>
 
-                <div class="form-group">
-                    <label class="form-label">Hospital</label>
-                    <select name="hospital" id="hospital-dropdown" class="form-control" required>
-                        <option value="">Loading hospitals...</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Additional information for reviewing officer</label>
-                    <textarea
-                        name="officer_note"
-                        class="form-control"
-                        rows="8"
-                        placeholder="Add any supporting explanation, urgency, or clarification for the officer."></textarea>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Medical bill</label>
-                    <div id="uploadZone" class="upload-dropzone">
-                        <div class="upload-copy">
-                            <strong>Drag and drop your document here</strong>
-                            <span class="muted">PDF, JPG, JPEG, or PNG. Preview updates instantly.</span>
+                <!-- ==================== STEP 1: BENEFICIARY DETAILS ==================== -->
+                <div class="wizard-step" id="step1">
+                    <h3 class="gov-section-title"><i class="fa-solid fa-user-gear"></i> Beneficiary Profile Details</h3>
+                    <p class="muted" style="margin-bottom: 1.5rem;">Verify or edit your profile information. Auto-filled fields are highlighted.</p>
+                    
+                    <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; align-items: center;">
+                        <div style="position: relative; width: 110px; height: 110px; border-radius: var(--radius-sm); border: 2px dashed var(--border); overflow: hidden; background: var(--bg-elevated); display: flex; align-items: center; justify-content: center;">
+                            <img id="photoPreviewImg" style="width: 100%; height: 100%; object-fit: cover; display: none;" alt="Profile Photo">
+                            <div id="photoPlaceholder" class="muted" style="text-align: center; font-size: 0.8rem; padding: 0.5rem;">
+                                <i class="fa-solid fa-user-tie" style="font-size: 2rem; margin-bottom: 0.25rem;"></i><br>Photo
+                            </div>
                         </div>
-                        <input type="file" name="bills" id="billInput" class="form-control" accept=".pdf,.jpg,.jpeg,.png" required multiple style="margin-top:1rem;">
-                        <div class="skeleton" style="margin-top:0.9rem; height:10px; border-radius:999px;">
-                            <div id="uploadProgress" style="width:0%; height:100%; border-radius:999px; background:linear-gradient(135deg, var(--primary), var(--accent)); transition:width 0.2s ease;"></div>
+                        <div style="flex: 1; min-width: 200px;">
+                            <label class="form-label">Passport Size Profile Photo</label>
+                            <input type="file" name="passport_photo" id="passportPhotoInput" class="form-control" accept="image/*">
+                            <span class="muted" style="font-size: 0.8rem;">JPEG or PNG formats only.</span>
                         </div>
                     </div>
+
+                    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label">Full Name <span style="color: var(--danger);">*</span></label>
+                            <input type="text" name="beneficiary_name" id="field_beneficiary_name" class="form-control" required placeholder="Full Name" value="{{ profile_data.profile.fullName or user.get('name') or '' }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">PPO Number <span style="color: var(--danger);">*</span></label>
+                            <input type="text" name="ppo_number" id="field_ppo_number" class="form-control" required placeholder="Pension Payment Order Number" value="{{ profile_data.auth.ppoNumber or user.get('ppoNumber') or '' }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Aadhaar Card Number (Masked) <span style="color: var(--danger);">*</span></label>
+                            <input type="text" name="aadhaar_number" id="field_aadhaar_number" class="form-control" required placeholder="XXXX-XXXX-XXXX" value="{{ profile_data.identity.aadhaarNumber or user.get('aadhaar_number') or '' }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Mobile Number <span style="color: var(--danger);">*</span></label>
+                            <input type="tel" name="mobile_number" id="field_mobile_number" class="form-control" required placeholder="10-digit number" value="{{ profile_data.auth.phone or mobile or '' }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Email Address <span style="color: var(--danger);">*</span></label>
+                            <input type="email" name="email_address" id="field_email_address" class="form-control" required placeholder="email@domain.com" value="{{ profile_data.auth.email or '' }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Date of Birth <span style="color: var(--danger);">*</span></label>
+                            <input type="date" name="dob" id="field_dob" class="form-control" required value="{{ profile_data.profile.dob or '' }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Date of Retirement</label>
+                            <input type="date" name="retirement_date" id="field_retirement_date" class="form-control" value="{{ profile_data.pension.retirementDate or '' }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Pension Category <span style="color: var(--danger);">*</span></label>
+                            <input type="text" name="pension_category" id="field_pension_category" class="form-control" required placeholder="e.g. Civil / Military / Family" value="{{ profile_data.pension.pensionType or '' }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Department <span style="color: var(--danger);">*</span></label>
+                            <input type="text" name="department" id="field_department" class="form-control" required placeholder="Retired Department" value="{{ profile_data.pension.retiredDepartment or '' }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Designation <span style="color: var(--danger);">*</span></label>
+                            <input type="text" name="designation" id="field_designation" class="form-control" required placeholder="Last Designation Held" value="{{ profile_data.pension.designation or '' }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Treasury Office <span style="color: var(--danger);">*</span></label>
+                            <input type="text" name="treasury_office" id="field_treasury_office" class="form-control" required placeholder="District Treasury Office" value="{{ profile_data.pension.treasuryOffice or '' }}">
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top: 1rem;">
+                        <label class="form-label">Residential Address <span style="color: var(--danger);">*</span></label>
+                        {% set full_addr = "" %}
+                        {% if profile_data.address and profile_data.address.doorNo %}
+                            {% set full_addr = (profile_data.address.doorNo ~ ' ' ~ profile_data.address.street ~ ', ' ~ profile_data.address.area ~ ', ' ~ profile_data.address.city ~ ', ' ~ profile_data.address.district ~ ', ' ~ profile_data.address.state ~ ' - ' ~ profile_data.address.pincode) %}
+                        {% endif %}
+                        <textarea name="address" id="field_address" class="form-control" rows="3" required placeholder="Enter complete home address">{{ full_addr }}</textarea>
+                    </div>
                 </div>
 
-                <div class="toolbar">
-                    <a href="{{ url_for('user.dashboard') }}" class="btn btn-secondary">Cancel</a>
-                    <button type="submit" class="btn btn-primary">Submit claim</button>
+                <!-- ==================== STEP 2: TREATMENT DETAILS ==================== -->
+                <div class="wizard-step" id="step2" style="display: none;">
+                    <h3 class="gov-section-title"><i class="fa-solid fa-house-medical"></i> Treatment & Hospital Details</h3>
+                    <p class="muted" style="margin-bottom: 1.5rem;">Enter details regarding the hospital and medical procedures. Scanning bills will auto-populate these.</p>
+                    
+                    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label">Patient Name <span style="color: var(--danger);">*</span></label>
+                            <input type="text" name="name" id="field_name" class="form-control" required placeholder="Patient's Full Name">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Relationship to Pensioner <span style="color: var(--danger);">*</span></label>
+                            <select name="relationship" id="field_relationship" class="form-control" required>
+                                <option value="Self">Self</option>
+                                <option value="Spouse">Spouse</option>
+                                <option value="Child">Child</option>
+                                <option value="Parent">Parent</option>
+                                <option value="Other">Other Dependent</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Disease Name <span style="color: var(--danger);">*</span></label>
+                            <input type="text" name="disease" id="field_disease" class="form-control" required placeholder="e.g. Coronary Artery Disease">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Diagnosis <span style="color: var(--danger);">*</span></label>
+                            <input type="text" name="diagnosis" id="field_diagnosis" class="form-control" required placeholder="Clinical Diagnosis">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Surgery/Procedure Type</label>
+                            <input type="text" name="surgery_type" id="field_surgery_type" class="form-control" placeholder="e.g. CABG / Angioplasty">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Treatment Category <span style="color: var(--danger);">*</span></label>
+                            <select name="treatment_category" id="field_treatment_category" class="form-control" required>
+                                <option value="Surgical">Surgical</option>
+                                <option value="Medical">Medical Treatment</option>
+                                <option value="Diagnostic">Diagnostic Tests</option>
+                                <option value="Daycare">Daycare Procedure</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Admission Date <span style="color: var(--danger);">*</span></label>
+                            <input type="date" name="admission_date" id="field_admission_date" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Surgery/Treatment Date</label>
+                            <input type="date" name="surgery_date" id="field_surgery_date" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Discharge Date <span style="color: var(--danger);">*</span></label>
+                            <input type="date" name="discharge_date" id="field_discharge_date" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Treating Doctor Name <span style="color: var(--danger);">*</span></label>
+                            <input type="text" name="doctor_name" id="field_doctor_name" class="form-control" required placeholder="Dr. Full Name">
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-top: 1rem;">
+                        <label class="form-label">Treating Hospital <span style="color: var(--danger);">*</span></label>
+                        <select name="hospital" id="hospital-dropdown" class="form-control" required>
+                            <option value="">Loading hospitals...</option>
+                        </select>
+                        <span id="hospitalNetworkBadge" style="margin-top: 0.5rem; display: inline-block;"></span>
+                    </div>
+                </div>
+
+                <!-- ==================== STEP 3: CLAIM DETAILS ==================== -->
+                <div class="wizard-step" id="step3" style="display: none;">
+                    <h3 class="gov-section-title"><i class="fa-solid fa-file-invoice-dollar"></i> Medical Claim Specifications</h3>
+                    <p class="muted" style="margin-bottom: 1.5rem;">Enter financial and historical details for this claim.</p>
+                    
+                    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label">Claim Number <span style="color: var(--danger);">*</span></label>
+                            <input type="text" name="claim_number" id="field_claim_number" class="form-control" required readonly placeholder="Generating...">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Claim Type <span style="color: var(--danger);">*</span></label>
+                            <select name="claim_type" id="field_claim_type" class="form-control" required>
+                                <option value="Reimbursement">Reimbursement</option>
+                                <option value="Cashless Advance">Cashless Advance</option>
+                                <option value="Part Payment">Part Payment / Balance Claim</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Claim Amount (INR) <span style="color: var(--danger);">*</span></label>
+                            <input type="number" name="amount" id="field_amount" class="form-control" required placeholder="Amount in Rupees" min="1" step="0.01">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Previous Claims Count <span style="color: var(--danger);">*</span></label>
+                            <input type="number" name="prev_claim_count" id="field_prev_claim_count" class="form-control" required value="0" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Previous Claim Reference Number</label>
+                            <input type="text" name="prev_claim_ref" id="field_prev_claim_ref" class="form-control" placeholder="Ref No. (if applicable)">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Emergency Case? <span style="color: var(--danger);">*</span></label>
+                            <select name="emergency_case" id="field_emergency_case" class="form-control" required>
+                                <option value="No">No</option>
+                                <option value="Yes">Yes (Requires Emergency Certificate)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Treatment Period (Days)</label>
+                            <input type="text" name="treatment_period" id="field_treatment_period" class="form-control" readonly placeholder="Calculated from dates">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== STEP 4: BANK DETAILS ==================== -->
+                <div class="wizard-step" id="step4" style="display: none;">
+                    <h3 class="gov-section-title"><i class="fa-solid fa-building-columns"></i> Bank Account Information</h3>
+                    <p class="muted" style="margin-bottom: 1.5rem;">Enter bank account details where the reimbursement amount should be credited.</p>
+                    
+                    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label">Bank Name <span style="color: var(--danger);">*</span></label>
+                            <input type="text" name="bank_name" id="field_bank_name" class="form-control" required placeholder="e.g. State Bank of India" value="{{ profile_data.bank.bankName or '' }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Branch Name <span style="color: var(--danger);">*</span></label>
+                            <input type="text" name="branch" id="field_branch" class="form-control" required placeholder="Branch Name" value="{{ profile_data.bank.branch or '' }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Account Number <span style="color: var(--danger);">*</span></label>
+                            <input type="text" name="account_number" id="field_account_number" class="form-control" required placeholder="Account Number" value="{{ profile_data.bank.accountNumber or '' }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">IFSC Code <span style="color: var(--danger);">*</span></label>
+                            <input type="text" name="ifsc" id="field_ifsc" class="form-control" required placeholder="SBIN0001234" value="{{ profile_data.bank.ifsc or '' }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">MICR Code</label>
+                            <input type="text" name="micr" id="field_micr" class="form-control" placeholder="9-digit MICR code" value="{{ profile_data.bank.micr or '' }}">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Account Type <span style="color: var(--danger);">*</span></label>
+                            <select name="account_type" id="field_account_type" class="form-control" required>
+                                <option value="Savings" {% if profile_data.bank.accountType == 'Savings' %}selected{% endif %}>Savings</option>
+                                <option value="Current" {% if profile_data.bank.accountType == 'Current' %}selected{% endif %}>Current</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">ECS Enabled? <span style="color: var(--danger);">*</span></label>
+                            <select name="ecs_enabled" id="field_ecs_enabled" class="form-control" required>
+                                <option value="Yes">Yes</option>
+                                <option value="No">No</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== STEP 5: ATTACHMENTS & SIGNATURE ==================== -->
+                <div class="wizard-step" id="step5" style="display: none;">
+                    <h3 class="gov-section-title"><i class="fa-solid fa-paperclip"></i> Support Documents & Uploads</h3>
+                    <p class="muted" style="margin-bottom: 1.5rem;">Upload medical bills, prescriptions, discharge summary, and other proof documents.</p>
+                    
+                    <div style="background: var(--bg-elevated); border: 1px solid var(--border); padding: 1rem; border-radius: var(--radius); margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+                        <div>
+                            <h4 style="margin:0;"><i class="fa-solid fa-wand-magic-sparkles" style="color: var(--primary);"></i> AI Auto-Population Engine</h4>
+                            <p class="muted" style="font-size: 0.85rem; margin: 0.25rem 0 0;">Upload your medical bill first and click Scan to extract treatment details automatically.</p>
+                        </div>
+                        <button type="button" class="btn btn-secondary btn-sm" id="scanBillBtn" onclick="scanBillsAjax()"><i class="fa-solid fa-magnifying-glass"></i> Scan & Autofill Form</button>
+                    </div>
+
+                    <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
+                        <div class="form-group">
+                            <label class="form-label">Medical Bills (Required) <span style="color: var(--danger);">*</span></label>
+                            <div class="upload-dropzone" id="dropZoneBills" style="padding: 1rem; border-width: 1px;">
+                                <input type="file" name="bills" id="billInput" class="form-control" accept=".pdf,.jpg,.jpeg,.png" required multiple>
+                                <span class="muted" style="font-size: 0.8rem; display: block; margin-top: 0.5rem;">You can select multiple bill files.</span>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Doctor's Prescriptions</label>
+                            <input type="file" name="prescriptions" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Discharge Summary</label>
+                            <input type="file" name="discharge_summary" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Investigation Reports</label>
+                            <input type="file" name="investigation_reports" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Emergency Certificate (if Emergency)</label>
+                            <input type="file" name="certificates" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Identity Proof (Aadhaar / Voter ID)</label>
+                            <input type="file" name="id_proof" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">PPO Certificate Proof</label>
+                            <input type="file" name="ppo_proof" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                        </div>
+                    </div>
+
+                    <!-- Declaration and Signature -->
+                    <div class="card" style="background: var(--bg-elevated); border-left: 4px solid var(--primary); margin-top: 2rem;">
+                        <h4 style="margin-bottom: 0.5rem;"><i class="fa-solid fa-file-contract"></i> Declaration & Covenants</h4>
+                        <p style="font-size: 0.9rem; line-height: 1.5; margin-bottom: 1rem;">
+                            "I hereby declare that the information furnished above is true and correct to the best of my knowledge. 
+                            I understand that furnishing false information may result in rejection of my claim and legal action."
+                        </p>
+                        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                            <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: normal; cursor: pointer;">
+                                <input type="checkbox" id="declarationCheck" required style="width: 18px; height: 18px;">
+                                <strong>I agree to the declaration statement.</strong>
+                            </label>
+                            <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 0.5rem;">
+                                <div class="form-group">
+                                    <label class="form-label">Signee Name (Type Full Name) <span style="color: var(--danger);">*</span></label>
+                                    <input type="text" id="signatureName" name="signature_name" class="form-control" required placeholder="Type name to sign">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Signature Date <span style="color: var(--danger);">*</span></label>
+                                    <input type="date" id="signatureDate" name="signature_date" class="form-control" required>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Wizard Actions Toolbar -->
+                <div class="toolbar" style="margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 1.5rem;">
+                    <button type="button" class="btn btn-secondary" id="backBtn" onclick="prevStep()"><i class="fa-solid fa-arrow-left"></i> Back</button>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button type="button" class="btn btn-secondary" id="saveDraftBtn" onclick="saveDraft()"><i class="fa-solid fa-floppy-disk"></i> Save Draft</button>
+                        <button type="button" class="btn btn-primary" id="nextBtn" onclick="nextStep()">Next <i class="fa-solid fa-arrow-right"></i></button>
+                        <button type="submit" class="btn btn-primary" id="submitBtn" style="display: none;"><i class="fa-solid fa-paper-plane"></i> Submit Application</button>
+                    </div>
                 </div>
             </form>
         </section>
 
-        <aside class="hero-panel" style="background: var(--surface-strong);">
-            <div class="card-header">
-                <div class="chip"><i class="fa-solid fa-magnifying-glass"></i> Live preview</div>
-                <h2 style="margin-top:0.75rem;">Document viewer</h2>
-                <p class="muted">Preview the uploaded document before you submit.</p>
+        <!-- Right Preview / Helper Sidebar -->
+        <aside class="hero-panel" style="background: var(--surface-strong); max-height: calc(100vh - 120px); overflow-y: auto; position: sticky; top: 100px;">
+            <div class="card-header" style="margin-bottom: 1rem;">
+                <div class="chip"><i class="fa-solid fa-magnifying-glass"></i> Live Preview</div>
+                <h2 style="margin-top:0.5rem; font-size: 1.5rem;">Files & Warnings</h2>
+                <p class="muted" style="font-size: 0.85rem;">View uploaded documents and checking criteria here.</p>
             </div>
 
-            <div id="previewBox" class="preview-box" style="display:none; padding:1rem;">
-                <div class="chip" id="fileNameChip">Multiple files selected</div>
-                <div id="filePreview" style="margin-top:0.9rem; display: flex; flex-direction: column; gap: 1rem;"></div>
-            </div>
-
-            <div class="card" style="margin-top:1rem; margin-bottom:0; background: var(--bg-elevated);">
-                <h3>Checklist</h3>
-                <ul style="margin:0; padding-left:1.2rem;" class="muted">
-                    <li>Use a clear, legible bill image or PDF.</li>
-                    <li>Ensure the hospital name matches the selected entry.</li>
-                    <li>Add notes if the claim needs context for review.</li>
+            <!-- Mandatory checklist warnings -->
+            <div class="card" style="background: var(--bg-elevated); margin-bottom: 1rem; border-left: 4px solid var(--warning);" id="missingMandatoryCard">
+                <h3 style="font-size: 1.05rem; margin-bottom: 0.5rem; color: var(--warning);"><i class="fa-solid fa-triangle-exclamation"></i> Mandatory Fields</h3>
+                <ul id="missingFieldsList" style="margin:0; padding-left:1.2rem; font-size: 0.85rem;" class="muted">
+                    <!-- Dynamic fields list -->
                 </ul>
+            </div>
+
+            <!-- Scan details -->
+            <div class="card" style="background: var(--bg-elevated); margin-bottom: 1rem; display: none;" id="ocrMetricsCard">
+                <h3 style="font-size: 1.05rem; margin-bottom: 0.5rem;"><i class="fa-solid fa-robot" style="color: var(--primary);"></i> AI Scan Details</h3>
+                <p class="muted" style="font-size: 0.85rem; margin-bottom: 0.5rem;" id="ocrConfidenceLabel">Confidence: N/A</p>
+                <div class="skeleton" style="height:8px; border-radius:999px;">
+                    <div id="ocrConfidenceBar" style="width:0%; height:100%; border-radius:999px; background:linear-gradient(135deg, var(--primary), var(--accent)); transition:width 0.3s ease;"></div>
+                </div>
+            </div>
+
+            <!-- Document previews container -->
+            <div id="previewBox" class="preview-box" style="display:none; padding:1rem;">
+                <div class="chip" id="fileNameChip" style="font-size: 0.8rem; padding: 0.25rem 0.5rem;">Document selected</div>
+                <div id="filePreview" style="margin-top:0.9rem; display: flex; flex-direction: column; gap: 0.75rem;"></div>
             </div>
         </aside>
     </div>
@@ -95,142 +392,702 @@
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/hospital_select.js') }}"></script>
 <script>
-    const zone = document.getElementById("uploadZone");
-    const fileInput = document.getElementById("billInput");
-    const previewBox = document.getElementById("previewBox");
-    const fileNameChip = document.getElementById("fileNameChip");
-    const filePreview = document.getElementById("filePreview");
-    const progressBar = document.getElementById("uploadProgress");
-    const claimForm = document.getElementById("claimForm");
+    let currentStep = 1;
+    const totalSteps = 5;
 
-    let selectedFiles = [];
+    // List of mandatory fields across steps
+    const mandatoryFields = {
+        1: ['field_beneficiary_name', 'field_ppo_number', 'field_aadhaar_number', 'field_mobile_number', 'field_email_address', 'field_dob', 'field_pension_category', 'field_department', 'field_designation', 'field_treasury_office', 'field_address'],
+        2: ['field_name', 'field_relationship', 'field_disease', 'field_diagnosis', 'field_treatment_category', 'field_admission_date', 'field_discharge_date', 'hospital-dropdown', 'field_doctor_name'],
+        3: ['field_claim_number', 'field_claim_type', 'field_amount', 'field_prev_claim_count', 'field_emergency_case'],
+        4: ['field_bank_name', 'field_branch', 'field_account_number', 'field_ifsc', 'field_account_type', 'field_ecs_enabled'],
+        5: ['billInput', 'declarationCheck', 'signatureName', 'signatureDate']
+    };
 
-    function renderPreviews(files) {
-        if (!files || files.length === 0) {
-            previewBox.style.display = "none";
+    // Auto-filled field trackers (to highlight them and prevent overwrite)
+    const autofilledFields = new Set();
+    const manuallyEditedFields = new Set();
+
+    document.addEventListener("DOMContentLoaded", function () {
+        // 1. Generate a claim number if not exists
+        const claimNumInput = document.getElementById("field_claim_number");
+        if (claimNumInput && !claimNumInput.value) {
+            const rand = Math.floor(100000 + Math.random() * 900000);
+            const year = new Date().getFullYear();
+            claimNumInput.value = `CLM-${year}-${rand}`;
+        }
+
+        // Set default signature date
+        const sigDateInput = document.getElementById("signatureDate");
+        if (sigDateInput && !sigDateInput.value) {
+            sigDateInput.value = new Date().toISOString().substring(0, 10);
+        }
+
+        // 2. Setup event listeners for inputs to save draft & track manual edits
+        const formInputs = document.querySelectorAll("#claimForm input, #claimForm select, #claimForm textarea");
+        formInputs.forEach(input => {
+            // Track manual edits
+            input.addEventListener("input", function() {
+                if (!input.classList.contains("auto-populated-bg")) {
+                    manuallyEditedFields.add(input.id || input.name);
+                }
+                saveDraftToLocalStorage();
+                updateMandatoryChecklist();
+            });
+            input.addEventListener("change", function() {
+                saveDraftToLocalStorage();
+                updateMandatoryChecklist();
+            });
+        });
+
+        // 3. Load draft from localStorage if exists
+        loadDraftFromLocalStorage();
+
+        // 4. Highlight pre-filled profile fields
+        highlightProfilePrefilled();
+
+        // 5. Update initial progress
+        updateProgress();
+        updateMandatoryChecklist();
+
+        // 6. Setup file inputs previews
+        setupFilePreviews();
+    });
+
+    function highlightProfilePrefilled() {
+        // Highlighting fields pre-filled by the backend context
+        const profileFields = [
+            'field_beneficiary_name', 'field_ppo_number', 'field_aadhaar_number',
+            'field_mobile_number', 'field_email_address', 'field_dob', 'field_pension_category',
+            'field_department', 'field_designation', 'field_treasury_office', 'field_address',
+            'field_bank_name', 'field_branch', 'field_account_number', 'field_ifsc', 'field_micr'
+        ];
+        profileFields.forEach(id => {
+            const field = document.getElementById(id);
+            if (field && field.value && !manuallyEditedFields.has(id)) {
+                field.classList.add("auto-populated-bg");
+                autofilledFields.add(id);
+                // Highlight with a subtle background and indicator
+                field.style.borderLeft = "3px solid var(--accent)";
+            }
+        });
+    }
+
+    function updateProgress() {
+        // Update tabs active state
+        for (let i = 1; i <= totalSteps; i++) {
+            const tabBtn = document.getElementById(`tabBtn${i}`);
+            if (tabBtn) {
+                if (i === currentStep) {
+                    tabBtn.className = "btn btn-primary";
+                } else if (i < currentStep) {
+                    tabBtn.className = "btn btn-secondary";
+                    tabBtn.style.opacity = "0.95";
+                } else {
+                    tabBtn.className = "btn btn-secondary";
+                    tabBtn.style.opacity = "0.6";
+                }
+            }
+        }
+
+        // Update step displays
+        for (let i = 1; i <= totalSteps; i++) {
+            const stepDiv = document.getElementById(`step${i}`);
+            if (stepDiv) {
+                stepDiv.style.display = (i === currentStep) ? "block" : "none";
+            }
+        }
+
+        // Update progress indicators
+        const progressRing = document.getElementById("progressRing");
+        const stepProgressText = document.getElementById("stepProgressText");
+        if (progressRing && stepProgressText) {
+            const pct = (currentStep / totalSteps) * 100;
+            progressRing.style.setProperty("--percent", `${pct}%`);
+            stepProgressText.textContent = `Step ${currentStep}/${totalSteps}`;
+        }
+
+        // Update buttons
+        const backBtn = document.getElementById("backBtn");
+        const nextBtn = document.getElementById("nextBtn");
+        const submitBtn = document.getElementById("submitBtn");
+
+        if (backBtn) backBtn.style.display = (currentStep === 1) ? "none" : "inline-flex";
+        if (nextBtn) nextBtn.style.display = (currentStep === totalSteps) ? "none" : "inline-flex";
+        if (submitBtn) submitBtn.style.display = (currentStep === totalSteps) ? "inline-flex" : "none";
+        
+        // Scroll to top of wizard on step change
+        document.getElementById("claimForm").scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function validateCurrentStep() {
+        const stepFields = mandatoryFields[currentStep];
+        if (!stepFields) return true;
+
+        let isValid = true;
+        stepFields.forEach(id => {
+            const field = document.getElementById(id) || document.getElementsByName(id)[0];
+            if (field) {
+                if (field.hasAttribute("required") && !field.value.trim()) {
+                    isValid = false;
+                    field.style.borderColor = "var(--danger)";
+                    field.classList.add("error-shake");
+                    setTimeout(() => field.classList.remove("error-shake"), 500);
+                } else {
+                    field.style.borderColor = "var(--border)";
+                }
+            }
+        });
+        return isValid;
+    }
+
+    function nextStep() {
+        if (validateCurrentStep()) {
+            if (currentStep < totalSteps) {
+                currentStep++;
+                updateProgress();
+                updateMandatoryChecklist();
+            }
+        } else {
+            showToast("danger", "Required Fields Missing", "Please fill in all mandatory fields before moving forward.");
+        }
+    }
+
+    function prevStep() {
+        if (currentStep > 1) {
+            currentStep--;
+            updateProgress();
+            updateMandatoryChecklist();
+        }
+    }
+
+    function goToStep(step) {
+        if (step < currentStep || validateCurrentStep()) {
+            currentStep = step;
+            updateProgress();
+            updateMandatoryChecklist();
+        } else {
+            showToast("danger", "Required Fields Missing", "Please fill in all mandatory fields.");
+        }
+    }
+
+    // Auto-calculate treatment duration if admission and discharge dates exist
+    function calculateDuration() {
+        const adDateVal = document.getElementById("field_admission_date").value;
+        const dcDateVal = document.getElementById("field_discharge_date").value;
+        const durationInput = document.getElementById("field_treatment_period");
+
+        if (adDateVal && dcDateVal && durationInput) {
+            const ad = new Date(adDateVal);
+            const dc = new Date(dcDateVal);
+            const diffTime = Math.abs(dc - ad);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1; 
+            durationInput.value = `${diffDays} Day(s)`;
+        }
+    }
+    
+    document.getElementById("field_admission_date").addEventListener("change", calculateDuration);
+    document.getElementById("field_discharge_date").addEventListener("change", calculateDuration);
+
+    // Live preview of profile photo
+    document.getElementById("passportPhotoInput").addEventListener("change", function () {
+        const file = this.files[0];
+        const preview = document.getElementById("photoPreviewImg");
+        const placeholder = document.getElementById("photoPlaceholder");
+        
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                preview.src = e.target.result;
+                preview.style.display = "block";
+                placeholder.style.display = "none";
+            };
+            reader.readAsDataURL(file);
+        } else {
+            preview.style.display = "none";
+            placeholder.style.display = "block";
+        }
+    });
+
+    // ==================== LOCALSTORAGE DRAFT ENGINE ====================
+    const localStorageKey = `medicurance_draft_${ "{{ mobile }}" }`;
+
+    function saveDraftToLocalStorage() {
+        const formData = {};
+        const inputs = document.querySelectorAll("#claimForm input, #claimForm select, #claimForm textarea");
+        inputs.forEach(input => {
+            if (input.type !== 'file' && input.name) {
+                if (input.type === 'checkbox') {
+                    formData[input.name] = input.checked;
+                } else {
+                    formData[input.name] = input.value;
+                }
+            }
+        });
+        localStorage.setItem(localStorageKey, JSON.stringify(formData));
+        
+        // Show status badge
+        const badge = document.getElementById("draftStatusBadge");
+        if (badge) {
+            badge.style.display = "inline-flex";
+            setTimeout(() => { badge.style.opacity = "1"; }, 10);
+        }
+    }
+
+    function loadDraftFromLocalStorage() {
+        const draftStr = localStorage.getItem(localStorageKey);
+        if (!draftStr) return;
+
+        try {
+            const draft = JSON.parse(draftStr);
+            Object.keys(draft).forEach(name => {
+                const value = draft[name];
+                const input = document.getElementsByName(name)[0];
+                if (input) {
+                    if (input.type === 'checkbox') {
+                        input.checked = !!value;
+                    } else {
+                        input.value = value;
+                    }
+                    // Mark as manually edited if it doesn't match default
+                    if (value && !input.classList.contains("auto-populated-bg")) {
+                        manuallyEditedFields.add(input.id || input.name);
+                    }
+                }
+            });
+            showToast("info", "Draft Restored", "Your previously saved claim draft has been restored.");
+        } catch (e) {
+            console.error("Error loading draft: ", e);
+        }
+    }
+
+    function saveDraft() {
+        saveDraftToLocalStorage();
+        showToast("success", "Draft Saved Successfully", "Your form draft is securely saved in your browser.");
+    }
+
+    // Clear draft on submit and show Processing overlay
+    document.getElementById("claimForm").addEventListener("submit", function () {
+        localStorage.removeItem(localStorageKey);
+        
+        // Build fullscreen overlay dynamically
+        const overlay = document.createElement("div");
+        overlay.id = "processingOverlay";
+        overlay.style.position = "fixed";
+        overlay.style.top = "0";
+        overlay.style.left = "0";
+        overlay.style.width = "100vw";
+        overlay.style.height = "100vh";
+        overlay.style.background = "rgba(10, 25, 47, 0.9)";
+        overlay.style.backdropFilter = "blur(8px)";
+        overlay.style.zIndex = "99999";
+        overlay.style.display = "flex";
+        overlay.style.flexDirection = "column";
+        overlay.style.justifyContent = "center";
+        overlay.style.alignItems = "center";
+        overlay.style.color = "#fff";
+
+        // Spinner with keyframe animation
+        const spinner = document.createElement("div");
+        spinner.style.width = "60px";
+        spinner.style.height = "60px";
+        spinner.style.border = "4px solid rgba(255, 255, 255, 0.1)";
+        spinner.style.borderTop = "4px solid var(--primary, #0070f3)";
+        spinner.style.borderRadius = "50%";
+        spinner.style.animation = "spin 1s linear infinite";
+        spinner.style.marginBottom = "1.5rem";
+
+        const animStyle = document.createElement("style");
+        animStyle.textContent = `
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        `;
+        document.head.appendChild(animStyle);
+
+        const title = document.createElement("h2");
+        title.textContent = "Processing Application";
+        title.style.margin = "0 0 0.5rem 0";
+        title.style.fontSize = "1.6rem";
+        title.style.fontWeight = "bold";
+
+        const desc = document.createElement("p");
+        desc.textContent = "Please wait while we verify your bills, compile official formats, and register your claim...";
+        desc.style.margin = "0";
+        desc.style.fontSize = "0.95rem";
+        desc.style.color = "rgba(255, 255, 255, 0.7)";
+        desc.style.textAlign = "center";
+        desc.style.maxWidth = "44ch";
+
+        overlay.appendChild(spinner);
+        overlay.appendChild(title);
+        overlay.appendChild(desc);
+        document.body.appendChild(overlay);
+    });
+
+    // ==================== MANDATORY FIELDS CHECKLIST ====================
+    function updateMandatoryChecklist() {
+        const list = document.getElementById("missingFieldsList");
+        const card = document.getElementById("missingMandatoryCard");
+        if (!list || !card) return;
+
+        list.innerHTML = "";
+        let missingCount = 0;
+
+        // Traverse all steps and find required fields that are empty
+        Object.keys(mandatoryFields).forEach(stepNum => {
+            const stepTitle = ["Beneficiary Details", "Treatment Details", "Claim Details", "Bank Details", "Attachments"][stepNum - 1];
+            
+            mandatoryFields[stepNum].forEach(id => {
+                const el = document.getElementById(id) || document.getElementsByName(id)[0];
+                if (el) {
+                    let label = "";
+                    if (el.placeholder) label = el.placeholder;
+                    else if (el.previousElementSibling && el.previousElementSibling.textContent) {
+                        label = el.previousElementSibling.textContent.replace("*", "").trim();
+                    } else {
+                        label = id.replace("field_", "").replace("Input", "").replace("_", " ").toUpperCase();
+                    }
+
+                    const val = el.value || "";
+                    const isEmpty = el.type === 'checkbox' ? !el.checked : !val.trim();
+                    
+                    if (isEmpty) {
+                        missingCount++;
+                        const li = document.createElement("li");
+                        li.innerHTML = `<strong>${stepTitle}</strong>: ${label}`;
+                        li.style.cursor = "pointer";
+                        li.onclick = () => goToStep(parseInt(stepNum));
+                        list.appendChild(li);
+                    }
+                }
+            });
+        });
+
+        if (missingCount === 0) {
+            card.style.borderLeftColor = "var(--success)";
+            list.innerHTML = `<li style="color: var(--success);"><i class="fa-solid fa-circle-check"></i> All mandatory fields completed!</li>`;
+        } else {
+            card.style.borderLeftColor = "var(--warning)";
+        }
+    }
+
+    // ==================== AJAX SCAN BILLS & AUTO-FILL ====================
+    function scanBillsAjax() {
+        const billInput = document.getElementById("billInput");
+        if (!billInput || billInput.files.length === 0) {
+            showToast("danger", "No Document Selected", "Please select or upload a medical bill to scan.");
             return;
         }
-        previewBox.style.display = "block";
-        fileNameChip.innerHTML = `<i class="fa-solid fa-file-circle-check"></i> ${files.length} document(s) selected`;
-        filePreview.innerHTML = "";
 
-        Array.from(files).forEach((file, index) => {
-            const fileWrapper = document.createElement("div");
-            fileWrapper.style.padding = "0.5rem";
-            fileWrapper.style.background = "var(--bg-elevated)";
-            fileWrapper.style.borderRadius = "8px";
-            fileWrapper.style.boxShadow = "var(--shadow-soft)";
-            
-            const fileHeader = document.createElement("div");
-            fileHeader.style.display = "flex";
-            fileHeader.style.justifyContent = "space-between";
-            fileHeader.style.alignItems = "center";
-            fileHeader.style.marginBottom = "0.5rem";
+        const scanBtn = document.getElementById("scanBillBtn");
+        scanBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Extracting details...';
+        scanBtn.disabled = true;
 
-            const fileLabel = document.createElement("div");
-            fileLabel.className = "muted";
-            fileLabel.style.fontSize = "0.85rem";
-            fileLabel.textContent = file.name;
-            
-            const removeBtn = document.createElement("button");
-            removeBtn.type = "button";
-            removeBtn.className = "btn btn-secondary btn-sm";
-            removeBtn.style.padding = "0.2rem 0.5rem";
-            removeBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
-            removeBtn.onclick = () => removeFile(index);
-            
-            fileHeader.appendChild(fileLabel);
-            fileHeader.appendChild(removeBtn);
-            fileWrapper.appendChild(fileHeader);
+        const formData = new FormData();
+        Array.from(billInput.files).forEach(file => {
+            formData.append("bills", file);
+        });
 
-            if (file.type.startsWith("image/")) {
-                const img = document.createElement("img");
-                img.style.width = "100%";
-                img.style.maxHeight = "280px";
-                img.style.objectFit = "cover";
-                img.style.borderRadius = "8px";
-                img.alt = "Bill preview";
-                const reader = new FileReader();
-                reader.onload = e => img.src = e.target.result;
-                reader.readAsDataURL(file);
-                fileWrapper.appendChild(img);
-            } else if (file.type === "application/pdf") {
-                const badge = document.createElement("div");
-                badge.className = "chip";
-                badge.innerHTML = '<i class="fa-solid fa-file-pdf"></i> PDF Document';
-                fileWrapper.appendChild(badge);
+        // Add CSRF Token
+        const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+
+        fetch("/api/scan_bills", {
+            method: "POST",
+            headers: {
+                "X-CSRFToken": csrfToken
+            },
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error("HTTP error " + response.status);
+            }
+            return response.json();
+        })
+        .then(res => {
+            scanBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> Scan & Autofill Form';
+            scanBtn.disabled = false;
+
+            if (res.ok && res.data) {
+                const data = res.data.entities || {};
+                const confidence = res.data.ocr_confidence || 0.0;
+                
+                // Show OCR Details Card
+                const ocrCard = document.getElementById("ocrMetricsCard");
+                const ocrConfBar = document.getElementById("ocrConfidenceBar");
+                const ocrConfLabel = document.getElementById("ocrConfidenceLabel");
+                
+                if (ocrCard && ocrConfBar && ocrConfLabel) {
+                    ocrCard.style.display = "block";
+                    ocrConfBar.style.width = `${confidence}%`;
+                    ocrConfLabel.innerHTML = `OCR confidence score: <strong>${confidence}%</strong>`;
+                }
+
+                // Autofill fields, keeping manual edits untouched
+                autofillField("field_name", data.patient_name, confidence);
+                autofillField("field_disease", data.diagnosis || data.treatment, confidence);
+                autofillField("field_diagnosis", data.diagnosis, confidence);
+                autofillField("field_surgery_type", data.procedure || (data.procedure_names && data.procedure_names[0]) || "", confidence);
+                autofillField("field_admission_date", formatDateISO(data.admission_date), confidence);
+                autofillField("field_discharge_date", formatDateISO(data.discharge_date), confidence);
+                autofillField("field_doctor_name", data.doctor_name, confidence);
+                autofillField("field_amount", data.claim_amount, confidence);
+
+                // Auto-calculate treatment duration
+                calculateDuration();
+
+                // Hospital lookup matching
+                if (data.hospital_name) {
+                    lookupHospitalDropdown(data.hospital_name);
+                }
+
+                showToast("success", "Scan Completed", `AI scanned the document with ${confidence}% confidence. Autofilled fields highlighted.`);
+                updateMandatoryChecklist();
             } else {
-                const badge = document.createElement("div");
-                badge.className = "chip";
-                badge.innerHTML = '<i class="fa-solid fa-circle-info"></i> File selected';
-                fileWrapper.appendChild(badge);
+                showToast("danger", "Extraction Failure", res.message || "Failed to extract entities from document.");
             }
-            filePreview.appendChild(fileWrapper);
+        })
+        .catch(err => {
+            scanBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> Scan & Autofill Form';
+            scanBtn.disabled = false;
+            console.error("OCR Scan Error:", err);
+            showToast("danger", "Scan Failed", "Unable to contact the AI OCR engine. Please type details manually.");
         });
     }
-    
-    function updateFileInput() {
-        const dataTransfer = new DataTransfer();
-        selectedFiles.forEach(file => dataTransfer.items.add(file));
-        fileInput.files = dataTransfer.files;
-        renderPreviews(selectedFiles);
-    }
-    
-    function removeFile(index) {
-        selectedFiles.splice(index, 1);
-        updateFileInput();
-    }
 
-    fileInput.addEventListener("change", function () {
-        if (this.files && this.files.length > 0) {
-            Array.from(this.files).forEach(file => selectedFiles.push(file));
-            updateFileInput();
+    function autofillField(id, value, confidence) {
+        const el = document.getElementById(id);
+        if (!el || !value) return;
+
+        // Never overwrite manual edits
+        if (manuallyEditedFields.has(id)) {
+            console.log(`Skipping autofill for ${id} because it has manual edits.`);
+            return;
         }
-    });
 
-    ["dragenter", "dragover"].forEach(evt => {
-        zone.addEventListener(evt, e => {
-            e.preventDefault();
-            zone.classList.add("dragover");
-        });
-    });
-    ["dragleave", "drop"].forEach(evt => {
-        zone.addEventListener(evt, e => {
-            e.preventDefault();
-            zone.classList.remove("dragover");
-        });
-    });
-    zone.addEventListener("drop", e => {
-        const files = e.dataTransfer.files;
-        if (files && files.length > 0) {
-            Array.from(files).forEach(file => selectedFiles.push(file));
-            updateFileInput();
-        }
-    });
+        el.value = value;
+        el.classList.add("auto-populated-bg");
+        autofilledFields.add(id);
 
-    claimForm.addEventListener("submit", function (event) {
-        event.preventDefault();
-        const formData = new FormData(claimForm);
-        const xhr = new XMLHttpRequest();
-        progressBar.style.width = "8%";
+        // Highlight with green border/left accent and show confidence score
+        el.style.borderLeft = `3px solid var(--success)`;
+        
+        // Remove previous confidence badges if any
+        const existingBadge = document.getElementById(`conf_${id}`);
+        if (existingBadge) existingBadge.remove();
 
-        xhr.upload.addEventListener("progress", function (e) {
-            if (e.lengthComputable) {
-                progressBar.style.width = `${Math.max(8, Math.min(100, Math.round((e.loaded / e.total) * 100)))}%`;
+        // Append confidence badge
+        const badge = document.createElement("span");
+        badge.id = `conf_${id}`;
+        badge.className = "badge";
+        badge.style.fontSize = "0.7rem";
+        badge.style.marginTop = "0.25rem";
+        badge.style.padding = "0.1rem 0.4rem";
+        badge.style.background = "rgba(17, 132, 91, 0.1)";
+        badge.style.color = "var(--success)";
+        badge.innerHTML = `<i class="fa-solid fa-robot"></i> AI Match (${confidence}%)`;
+        el.parentNode.appendChild(badge);
+    }
+
+    function lookupHospitalDropdown(hospitalName) {
+        const select = document.getElementById("hospital-dropdown");
+        if (!select) return;
+
+        // Try to find exact or partial match in dropdown option text
+        let bestOption = null;
+        let highestSim = 0;
+
+        Array.from(select.options).forEach(opt => {
+            if (opt.value) {
+                const sim = similarityRatio(hospitalName.toLowerCase(), opt.text.toLowerCase());
+                if (sim > highestSim) {
+                    highestSim = sim;
+                    bestOption = opt;
+                }
             }
         });
 
-        xhr.addEventListener("load", function () {
-            progressBar.style.width = "100%";
-            window.location.href = xhr.responseURL || "{{ url_for('user.claim_status') }}";
-        });
+        // If similarity ratio is high (e.g. > 0.65), pre-select and trigger select styling
+        if (bestOption && highestSim > 0.65) {
+            if (!manuallyEditedFields.has("hospital-dropdown")) {
+                select.value = bestOption.value;
+                select.classList.add("auto-populated-bg");
+                select.style.borderLeft = `3px solid var(--success)`;
+                
+                // Trigger hospital network check callback if exists
+                if (window.checkHospitalNetwork) {
+                    window.checkHospitalNetwork(bestOption.value);
+                }
+            }
+        }
+    }
 
-        xhr.addEventListener("error", function () {
-            progressBar.style.width = "0%";
-        });
+    function similarityRatio(s1, s2) {
+        let longer = s1;
+        let shorter = s2;
+        if (s1.length < s2.length) {
+            longer = s2;
+            shorter = s1;
+        }
+        let longerLength = longer.length;
+        if (longerLength === 0) {
+            return 1.0;
+        }
+        return (longerLength - editDistance(longer, shorter)) / parseFloat(longerLength);
+    }
 
-        xhr.open("POST", claimForm.action, true);
-        xhr.send(formData);
-    });
+    function editDistance(s1, s2) {
+        s1 = s1.toLowerCase();
+        s2 = s2.toLowerCase();
+
+        let costs = new Array();
+        for (let i = 0; i <= s1.length; i++) {
+            let lastValue = i;
+            for (let j = 0; j <= s2.length; j++) {
+                if (i == 0)
+                    costs[j] = j;
+                else {
+                    if (j > 0) {
+                        let newValue = costs[j - 1];
+                        if (s1.charAt(i - 1) != s2.charAt(j - 1))
+                            newValue = Math.min(Math.min(newValue, lastValue),
+                                costs[j]) + 1;
+                        costs[j - 1] = lastValue;
+                        lastValue = newValue;
+                    }
+                }
+            }
+            if (i > 0)
+                costs[s2.length] = lastValue;
+        }
+        return costs[s2.length];
+    }
+
+    function formatDateISO(dateStr) {
+        if (!dateStr) return "";
+        // Convert DD/MM/YYYY or text format to YYYY-MM-DD for input[type=date]
+        const clean = dateStr.replace(/[\.\/]/g, "-").trim();
+        const parts = clean.split("-");
+        if (parts.length === 3) {
+            if (parts[0].length === 4) return clean; // already YYYY-MM-DD
+            if (parts[2].length === 4) return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`; // DD-MM-YYYY
+        }
+        return dateStr;
+    }
+
+    // ==================== DOCUMENT PREVIEWS ====================
+    function setupFilePreviews() {
+        const fileInputs = document.querySelectorAll("#claimForm input[type='file']");
+        const previewBox = document.getElementById("previewBox");
+        const filePreview = document.getElementById("filePreview");
+        const fileNameChip = document.getElementById("fileNameChip");
+
+        fileInputs.forEach(input => {
+            input.addEventListener("change", function () {
+                // Compile and show preview for all file inputs with files selected
+                let allFiles = [];
+                fileInputs.forEach(inp => {
+                    if (inp.files && inp.files.length > 0) {
+                        Array.from(inp.files).forEach(f => {
+                            allFiles.push({ file: f, label: inp.previousElementSibling ? inp.previousElementSibling.textContent.replace("*", "").trim() : inp.name });
+                        });
+                    }
+                });
+
+                if (allFiles.length === 0) {
+                    previewBox.style.display = "none";
+                    return;
+                }
+
+                previewBox.style.display = "block";
+                fileNameChip.innerHTML = `<i class="fa-solid fa-file-shield"></i> ${allFiles.length} file(s) attached`;
+                filePreview.innerHTML = "";
+
+                allFiles.forEach(item => {
+                    const wrap = document.createElement("div");
+                    wrap.style.padding = "0.5rem";
+                    wrap.style.background = "var(--bg-elevated)";
+                    wrap.style.borderRadius = "8px";
+                    wrap.style.boxShadow = "var(--shadow-soft)";
+                    
+                    const header = document.createElement("div");
+                    header.style.display = "flex";
+                    header.style.justifyContent = "space-between";
+                    header.style.alignItems = "center";
+                    header.style.marginBottom = "0.3rem";
+
+                    const fileLabel = document.createElement("div");
+                    fileLabel.style.fontSize = "0.8rem";
+                    fileLabel.innerHTML = `<strong style="color: var(--primary);">${item.label}</strong>: <span class="muted">${item.file.name}</span>`;
+                    
+                    header.appendChild(fileLabel);
+                    wrap.appendChild(header);
+
+                    if (item.file.type.startsWith("image/")) {
+                        const img = document.createElement("img");
+                        img.style.width = "100%";
+                        img.style.maxHeight = "150px";
+                        img.style.objectFit = "cover";
+                        img.style.borderRadius = "6px";
+                        
+                        const reader = new FileReader();
+                        reader.onload = e => img.src = e.target.result;
+                        reader.readAsDataURL(item.file);
+                        wrap.appendChild(img);
+                    } else {
+                        const badge = document.createElement("div");
+                        badge.className = "chip";
+                        badge.style.fontSize = "0.75rem";
+                        badge.style.padding = "0.2rem 0.5rem";
+                        badge.innerHTML = `<i class="fa-solid fa-file-pdf"></i> PDF Document (${Math.round(item.file.size/1024)} KB)`;
+                        wrap.appendChild(badge);
+                    }
+                    filePreview.appendChild(wrap);
+                });
+            });
+        });
+    }
+
+    // ==================== TOAST MESSAGES ====================
+    function showToast(category, title, message) {
+        const stack = document.getElementById("toastStack");
+        if (!stack) return;
+
+        const toast = document.createElement("div");
+        toast.className = `toast toast-${category} animate-in`;
+        toast.innerHTML = `
+            <strong style="display:block; margin-bottom:0.25rem;">${title}</strong>
+            <div>${message}</div>
+        `;
+        stack.appendChild(toast);
+
+        setTimeout(() => {
+            toast.classList.add("toast-hide");
+            setTimeout(() => toast.remove(), 250);
+        }, 4000);
+    }
 </script>
+
+<style>
+    .auto-populated-bg {
+        background-color: rgba(18, 165, 148, 0.05) !important;
+        border-color: var(--accent) !important;
+    }
+    
+    .wizard-step {
+        animation: fadeUp 0.3s ease-out;
+    }
+
+    .error-shake {
+        animation: shake 0.4s ease-in-out;
+    }
+
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-4px); }
+        75% { transform: translateX(4px); }
+    }
+</style>
 {% endblock %}

@@ -19,6 +19,8 @@ supabase
 # Document generation
 python-docx
 fpdf2
+reportlab
+qrcode
 
 # OCR and document processing
 pdfplumber

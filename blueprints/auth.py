@@ -882,6 +882,16 @@ def verify_identity_submit():
         session["authenticated"] = True
 
         log_audit(pending_mobile, "identity_verified", f"Government identity verified for ppo_number={_pick_nested(employee, 'auth.ppoNumber', 'auth.ppo_number')}")
+        
+        # Auto-generate e-card for the newly verified beneficiary
+        try:
+            verified_user = users_collection.find_one({"mobile": pending_mobile}) or employee
+            if verified_user:
+                from services.ecard_generator import generate_and_save_ecard
+                generate_and_save_ecard(pending_mobile, verified_user)
+        except Exception as e:
+            logger.warning(f"[AuthVerification] Auto e-card generation failed: {e}")
+
         flash("Identity verified successfully. Welcome back!", "success")
         logger.info("[AUTH] User login success | mobile=%s", pending_mobile)
         return redirect(url_for('user.dashboard'))

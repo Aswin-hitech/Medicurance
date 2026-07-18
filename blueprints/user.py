@@ -4,6 +4,7 @@ from flask import Blueprint, flash, redirect, render_template, request, send_fil
 from utils.auth_utils import role_required
 
 from database.mongo_client import claims_collection, users_collection, govt_collection
+from database.govt_repository import get_employee_by_aadhaar, get_employee_by_mobile, get_employee_by_ppo
 from database.hospital_repository import get_all_hospitals
 from database.claim_repository import get_claims_by_user
 from utils.status_utils import normalize_claim_status
@@ -46,7 +47,29 @@ def chat():
 @user_bp.route("/claim_request")
 @role_required("user")
 def claim_request():
-    return render_template("claim_request.html")
+    mobile = session.get("mobile") or session.get("user_id")
+    resolved = resolve_role(mobile, preferred_role="user")
+    user = resolved.get("document") or {}
+
+    if not user and mobile:
+        from database.user_repository import get_user_by_mobile
+        user = get_user_by_mobile(mobile) or {}
+
+
+    employee = None
+    if user.get("ppo_number"):
+        employee = get_employee_by_ppo(user.get("ppo_number"))
+    if not employee and user.get("aadhaar_number"):
+        employee = get_employee_by_aadhaar(user.get("aadhaar_number"))
+    if not employee:
+        employee = get_employee_by_mobile(mobile)
+
+    if not user:
+        user = {"mobile": mobile, "role": "user", "is_government_employee": False}
+
+    safe_employee = employee or {}
+    profile_data = build_pensioner_profile(safe_employee or user)
+    return render_template("claim_request.html", profile_data=profile_data, user=user, mobile=mobile)
 
 @user_bp.route("/submit_claim", methods=["POST"])
 @role_required("user")
@@ -68,16 +91,27 @@ def submit_claim():
         flash("Please complete government identity verification before submitting claims.", "danger")
         return redirect(url_for('user.profile'))
 
+    # Collect all uploaded files by key
+    attachments = {}
+    
     bills = request.files.getlist("bills")
     if not bills or len(bills) == 0 or (len(bills) == 1 and bills[0].filename == ''):
-        # Fallback for old templates
         if "bill" in request.files and request.files["bill"].filename != '':
             bills = [request.files["bill"]]
-        else:
-            flash("No document uploaded", "danger")
-            return redirect(url_for('user.claim_request'))
+            
+    attachments["bills"] = [f for f in bills if f and f.filename != '']
+    
+    for key in ["prescriptions", "discharge_summary", "investigation_reports", "certificates", "id_proof", "ppo_proof", "passport_photo"]:
+        files_for_key = request.files.getlist(key)
+        filtered = [f for f in files_for_key if f and f.filename != '']
+        if filtered:
+            attachments[key] = filtered
 
-    service = ClaimProcessingService(mobile, request.form, bills)
+    if not attachments["bills"]:
+        flash("No medical bills document uploaded", "danger")
+        return redirect(url_for('user.claim_request'))
+
+    service = ClaimProcessingService(mobile, request.form, attachments)
 
     try:
         result = service.process_claim()
@@ -86,18 +120,18 @@ def submit_claim():
             return redirect(url_for("user.claim_request"))
 
         decision = result.get("decision", "Pending")
-        if decision == "Approve":
-            flash("Claim approved by the agentic workflow.", "success")
-        elif decision == "Reject":
-            flash("Claim rejected by the agentic workflow.", "warning")
-        elif decision == "Request Additional Documents":
-            flash("Additional documents are required before the claim can move forward.", "warning")
-        else:
-            flash("Claim submitted successfully for officer review.", "success")
+        # Return success screen to citizen without technical agentic jargon
+        claim_data = result.get("claim") or {}
+        pdf_url = claim_data.get("generated_application", {}).get("pdf_url")
+        return render_template(
+            "claim_submit_success.html",
+            claim_id=result.get("claim_id"),
+            pdf_url=pdf_url,
+            message="Your application has been sent successfully."
+        )
     except Exception as e:
         flash(f"Error processing claim: {str(e)}", "danger")
-
-    return redirect(url_for('user.claim_status'))
+        return redirect(url_for('user.claim_request'))
 
 
 @user_bp.route("/edit_claim/<claim_id>", methods=["GET", "POST"])
@@ -152,6 +186,32 @@ def claim_status():
     claims = get_claims_by_user(mobile, skip=skip, limit=limit)
     for claim in claims:
         claim.update(enrich_claim_for_view(claim))
+        # Dynamic fallback to generate application form on the fly if missing
+        if not claim.get("generated_application") or not claim.get("generated_application", {}).get("pdf_url"):
+            try:
+                from database.mongo_client import govt_collection, users_collection
+                from services.government_application_generator import generate_and_upload_application
+                phone_digits = "".join(ch for ch in str(mobile or "") if ch.isdigit())
+                pensioner = govt_collection.find_one({"$or": [{"mobile": phone_digits}, {"phone": phone_digits}]}) or users_collection.find_one({"$or": [{"mobile": phone_digits}, {"phone": phone_digits}]}) or {}
+                
+                passport_photo_url = (
+                    pensioner.get("profilePhoto") or
+                    pensioner.get("profile", {}).get("profilePhoto") or
+                    pensioner.get("profile", {}).get("photo") or
+                    pensioner.get("profile", {}).get("photo_url") or
+                    (pensioner.get("documents", {}).get("profilePhoto", {}).get("url") if isinstance(pensioner.get("documents", {}).get("profilePhoto"), dict) else pensioner.get("documents", {}).get("profilePhoto"))
+                )
+                
+                claim_id = claim.get("claim_id")
+                claim_data = {k: v for k, v in claim.items()}
+                gen_docs = generate_and_upload_application(claim_id, claim_data, photo_url=passport_photo_url)
+                if gen_docs:
+                    from database.mongo_client import claims_collection
+                    claims_collection.update_one({"claim_id": claim_id}, {"$set": {"generated_application": gen_docs}})
+                    claim["generated_application"] = gen_docs
+            except Exception as gen_err:
+                print(f"[UserClaimStatusAppGen] Failed to generate application on the fly: {gen_err}")
+
     return render_template("claim_status.html", claims=claims, page=page, total_pages=total_pages, limit=limit)
 
 @user_bp.route("/profile")
@@ -172,7 +232,6 @@ def profile():
         from database.user_repository import get_user_by_mobile
         user = get_user_by_mobile(mobile) or {}
 
-    from database.govt_repository import get_employee_by_aadhaar, get_employee_by_mobile, get_employee_by_ppo
 
     employee = None
     if user.get("ppo_number"):
@@ -253,6 +312,16 @@ def update_profile():
     if result.matched_count == 0:
         # User may be in the legacy users collection instead of govtlist
         users_collection.update_one(query, {"$set": update_doc}, upsert=False)
+        
+    # Auto-regenerate e-Health card on profile changes
+    try:
+        updated_profile = get_employee_by_mobile(mobile) or users_collection.find_one(query)
+        if updated_profile:
+            from services.ecard_generator import generate_and_save_ecard
+            generate_and_save_ecard(mobile, updated_profile)
+    except Exception as e:
+        logger.warning(f"[ProfileUpdate] Auto e-card regeneration failed: {e}")
+
     flash("Profile updated successfully.", "success")
     return redirect(url_for("user.profile"))
 
@@ -371,3 +440,73 @@ def generate_letter(claim_id, letter_type):
         download_name=f"Claim_{claim_id[-8:]}_{letter_type}.pdf",
         mimetype="application/pdf",
     )
+
+
+@user_bp.route("/profile/regenerate_card", methods=["POST"])
+@role_required("user")
+def regenerate_card():
+    mobile = session.get("mobile") or session.get("user_id")
+    if not mobile:
+        flash("Profile not found", "warning")
+        return redirect(url_for("auth.login"))
+
+    safe_employee = get_employee_by_mobile(mobile)
+    user_doc = users_collection.find_one({"mobile": "".join(ch for ch in str(mobile) if ch.isdigit())}) or {}
+    profile_doc = safe_employee or user_doc
+
+    if not profile_doc:
+        flash("Could not retrieve profile for card generation.", "danger")
+        return redirect(url_for("user.profile"))
+
+    from services.ecard_generator import generate_and_save_ecard
+    assets = generate_and_save_ecard(mobile, profile_doc)
+    if assets:
+        flash("e-Health Card regenerated successfully.", "success")
+    else:
+        flash("Failed to regenerate e-Health Card. Please check your profile details.", "danger")
+
+    return redirect(url_for("user.profile"))
+
+
+@user_bp.route("/profile/download_card/<format_type>")
+@role_required("user")
+def download_card(format_type):
+    mobile = session.get("mobile") or session.get("user_id")
+    if not mobile:
+        flash("Profile not found", "warning")
+        return redirect(url_for("auth.login"))
+
+    safe_employee = get_employee_by_mobile(mobile)
+    user_doc = users_collection.find_one({"mobile": "".join(ch for ch in str(mobile) if ch.isdigit())}) or {}
+    profile_doc = safe_employee or user_doc
+
+    ecard = profile_doc.get("ecard", {})
+    if not ecard:
+        # Auto generate if missing
+        from services.ecard_generator import generate_and_save_ecard
+        ecard = generate_and_save_ecard(mobile, profile_doc) or {}
+
+    if not ecard:
+        flash("e-Health Card has not been generated yet. Please complete your profile details.", "warning")
+        return redirect(url_for("user.profile"))
+
+    if format_type == "pdf":
+        url = ecard.get("pdf_url")
+    elif format_type == "front":
+        url = ecard.get("front_url")
+    elif format_type == "back":
+        url = ecard.get("back_url")
+    else:
+        flash("Invalid download format.", "danger")
+        return redirect(url_for("user.profile"))
+
+    if not url:
+        flash("Requested file is not available.", "danger")
+        return redirect(url_for("user.profile"))
+
+    if "download=" not in url:
+        url += "&download=true" if "?" in url else "?download=true"
+    else:
+        url = url.replace("download=false", "download=true")
+
+    return redirect(url)

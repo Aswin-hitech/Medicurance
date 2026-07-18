@@ -64,12 +64,63 @@ def review_page(claim_id):
         return redirect(url_for('officer.dashboard'))
     officer_name = session.get("officer_name") or session.get("user_name") or session.get("mobile") or "Claims Officer"
     officer_id = session.get("user_id") or session.get("mobile")
-    reserve = reserve_claim_for_officer(claim_id, officer_name, officer_id=officer_id, actor=session.get("mobile", "officer"))
-    if not reserve.get("ok") and reserve.get("status") == "locked":
-        flash(reserve.get("message", "Claim is already being handled by another officer."), "warning")
-        return redirect(url_for("officer.dashboard"))
+    
+    current_owner = claim.get("handled_by")
+    current_owner_id = claim.get("handled_by_id")
+    is_assigned_to_me = False
+    
+    if current_owner and current_owner_id:
+        if current_owner_id != str(officer_id) and current_owner != officer_name:
+            flash(f"This claim is already handled by {current_owner}.", "warning")
+            return redirect(url_for("officer.dashboard"))
+        is_assigned_to_me = True
+
     claim = enrich_claim_for_view(claim)
-    return render_template("officer_claim_review.html", claim=claim)
+    
+    # Retrieve pensioner's ecard info
+    from database.mongo_client import govt_collection, users_collection
+    ppo = claim.get("ppo_number")
+    mobile = claim.get("mobile")
+    phone_digits = "".join(ch for ch in str(mobile or "") if ch.isdigit())
+    pensioner = govt_collection.find_one({"$or": [{"ppo_number": ppo}, {"mobile": phone_digits}, {"phone": phone_digits}]})
+    if not pensioner:
+        pensioner = users_collection.find_one({"$or": [{"ppo_number": ppo}, {"mobile": phone_digits}, {"phone": phone_digits}]}) or {}
+    ecard = pensioner.get("ecard", {})
+
+    # Dynamic fallback to generate application form on the fly if missing
+    if not claim.get("generated_application") or not claim.get("generated_application", {}).get("pdf_url"):
+        try:
+            from services.government_application_generator import generate_and_upload_application
+            claim_data = {k: v for k, v in claim.items()}
+            passport_photo_url = (
+                pensioner.get("profilePhoto") or
+                pensioner.get("profile", {}).get("profilePhoto") or
+                pensioner.get("profile", {}).get("photo") or
+                pensioner.get("profile", {}).get("photo_url") or
+                (pensioner.get("documents", {}).get("profilePhoto", {}).get("url") if isinstance(pensioner.get("documents", {}).get("profilePhoto"), dict) else pensioner.get("documents", {}).get("profilePhoto"))
+            )
+            gen_docs = generate_and_upload_application(claim_id, claim_data, photo_url=passport_photo_url)
+            if gen_docs:
+                claims_collection.update_one({"claim_id": claim_id}, {"$set": {"generated_application": gen_docs}})
+                claim["generated_application"] = gen_docs
+        except Exception as gen_err:
+            print(f"[ReviewPageAppGen] Failed to generate application on the fly: {gen_err}")
+
+    return render_template("officer_claim_review.html", claim=claim, ecard=ecard, is_assigned_to_me=is_assigned_to_me)
+
+@officer_bp.route("/assign/<claim_id>", methods=["POST"])
+@role_required("officer")
+def assign_claim(claim_id):
+    officer_name = session.get("officer_name") or session.get("user_name") or session.get("mobile") or "Claims Officer"
+    officer_id = session.get("user_id") or session.get("mobile")
+    
+    from services.workflow_service import reserve_claim_for_officer
+    reserve = reserve_claim_for_officer(claim_id, officer_name, officer_id=officer_id, actor=session.get("mobile", "officer"))
+    if reserve.get("ok"):
+        flash("Claim assigned to you successfully.", "success")
+    else:
+        flash(reserve.get("message", "Could not assign claim to you."), "danger")
+    return redirect(url_for("officer.review_page", claim_id=claim_id))
 
 @officer_bp.route("/approve/<claim_id>", methods=["POST"])
 @role_required("officer")
@@ -245,3 +296,64 @@ def profile():
     }
     
     return render_template("officer_profile.html", officer=officer, stats=stats)
+
+
+@officer_bp.route("/verify_card/<token>")
+@role_required(["officer", "admin"])
+def verify_card(token):
+    from services.ecard_generator import decode_verification_token
+    from services.pensioner_service import build_pensioner_profile
+    from database.mongo_client import claims_collection, govt_collection, users_collection
+    from services.auth_service import resolve_role
+    
+    payload, error = decode_verification_token(token)
+    if error:
+        flash(f"Verification Failed: {error}", "danger")
+        return redirect(url_for("officer.dashboard"))
+        
+    ppo_number = payload.get("sub")
+    mobile = payload.get("mobile")
+    
+    phone_digits = "".join(ch for ch in str(mobile or "") if ch.isdigit())
+    
+    # Query pensioner
+    safe_employee = govt_collection.find_one({"$or": [{"ppo_number": ppo_number}, {"mobile": phone_digits}, {"phone": phone_digits}]})
+    user_doc = users_collection.find_one({"$or": [{"ppo_number": ppo_number}, {"mobile": phone_digits}, {"phone": phone_digits}]}) or {}
+    profile_doc = safe_employee or user_doc
+    
+    if not profile_doc:
+        flash("Beneficiary profile not found for this card.", "danger")
+        return redirect(url_for("officer.dashboard"))
+        
+    # Build pensioner profile
+    profile_data = build_pensioner_profile(profile_doc)
+    
+    # Fetch active claim history
+    claims = list(claims_collection.find({"mobile": phone_digits}).sort("created_at", -1))
+    for c in claims:
+        c["_id"] = str(c["_id"])
+    
+    # Fetch previous AI trust scores
+    trust_scores = []
+    for c in claims:
+        t_score = c.get("trust_result", {}).get("score") or c.get("trust_score")
+        if t_score is not None:
+            trust_scores.append({
+                "claim_id": c["claim_id"],
+                "date": c.get("created_at") or c.get("date"),
+                "score": round(float(t_score), 1),
+                "status": c.get("status", "Pending")
+            })
+            
+    # Hospital eligibility rules lookup
+    hospital_eligibility = "Eligible for Cashless Reimbursement" if profile_data.get("claimEligibility", True) else "Claim eligibility suspended"
+    
+    return render_template(
+        "verify_card.html",
+        profile_data=profile_data,
+        claims=claims,
+        trust_scores=trust_scores,
+        hospital_eligibility=hospital_eligibility,
+        issued_at=profile_doc.get("ecard", {}).get("issued_at"),
+        ecard=profile_doc.get("ecard", {})
+    )
