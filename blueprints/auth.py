@@ -435,9 +435,9 @@ def login():
 @auth_bp.route("/send_otp", methods=["POST"])
 @limit_route("5 per minute", redirect_endpoint="auth.login", message="Too many OTP requests. Please wait a moment.")
 def send_otp_route():
-    ppo_number = request.form.get("ppo_number") or request.form.get("ppoNumber")
-    officer_id = request.form.get("officer_id") or request.form.get("officerId")
-    mobile_number = request.form.get("mobile_number") or request.form.get("mobile") or request.form.get("phone")
+    ppo_number = request.form.get("ppo_number") or request.form.get("ppoNumber") or session.get("pending_login_ppo")
+    officer_id = request.form.get("officer_id") or request.form.get("officerId") or session.get("pending_login_officer_id")
+    mobile_number = request.form.get("mobile_number") or request.form.get("mobile") or request.form.get("phone") or session.get("pending_login_phone")
 
     if officer_id:
         officer_doc, error = _resolve_officer_by_id_and_mobile(officer_id, mobile_number)

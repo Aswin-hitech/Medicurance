@@ -82,6 +82,60 @@ class ClaimProcessingService:
                     urls[field_name].append(url)
         return urls
 
+    def _fetch_profile_documents(self, uploaded_urls):
+        """Fetch pre-uploaded profile photo and documents from user profile in database if missing."""
+        try:
+            from database.mongo_client import govt_collection, users_collection
+            phone_digits = "".join(ch for ch in str(self.mobile or "") if ch.isdigit())
+            query = {"$or": [{"auth.phone": phone_digits}, {"mobile": phone_digits}, {"phone": phone_digits}]}
+            p_doc = govt_collection.find_one(query) or users_collection.find_one(query) or {}
+            docs = p_doc.get("documents") or {}
+            
+            # Helper to extract URL from a document sub-document (which can be a string or a dict)
+            def get_doc_url(doc_field):
+                if not doc_field:
+                    return None
+                if isinstance(doc_field, dict):
+                    return doc_field.get("url")
+                return str(doc_field)
+
+            # 1. Passport Size Photo
+            if not uploaded_urls.get("passport_photo"):
+                photo_url = (
+                    p_doc.get("profilePhoto") or
+                    p_doc.get("profile", {}).get("profilePhoto") or
+                    p_doc.get("profile", {}).get("photo") or
+                    p_doc.get("profile", {}).get("photo_url") or
+                    get_doc_url(docs.get("profilePhoto"))
+                )
+                if photo_url:
+                    uploaded_urls["passport_photo"] = [photo_url]
+                    logger.info("[ClaimProcessing] Fetched passport photo from user profile: %s", photo_url)
+
+            # 2. ID Proof (Aadhaar, PAN, Voter ID)
+            if not uploaded_urls.get("id_proof"):
+                id_url = get_doc_url(docs.get("aadhaar")) or get_doc_url(docs.get("pan")) or get_doc_url(docs.get("voterId"))
+                if id_url:
+                    uploaded_urls["id_proof"] = [id_url]
+                    logger.info("[ClaimProcessing] Fetched ID proof from user profile documents: %s", id_url)
+
+            # 3. PPO Proof (PPO Document or Bank Passbook)
+            if not uploaded_urls.get("ppo_proof"):
+                ppo_url = get_doc_url(docs.get("ppo")) or get_doc_url(docs.get("bankPassbook"))
+                if ppo_url:
+                    uploaded_urls["ppo_proof"] = [ppo_url]
+                    logger.info("[ClaimProcessing] Fetched PPO proof from user profile documents: %s", ppo_url)
+
+            # 4. Certificates / Digital Life Certificate
+            if not uploaded_urls.get("certificates"):
+                cert_url = get_doc_url(docs.get("digitalLifeCertificate")) or get_doc_url(docs.get("certificates"))
+                if cert_url:
+                    uploaded_urls["certificates"] = [cert_url]
+                    logger.info("[ClaimProcessing] Fetched certificates from user profile documents: %s", cert_url)
+
+        except Exception as e:
+            logger.warning("[ClaimProcessing] Failed to fetch documents from profile: %s", e)
+
     def run_ocr(self):
         from services.ocr_service import extract_text_advanced
         full_text = []
@@ -310,6 +364,8 @@ class ClaimProcessingService:
         try:
             # 1. Upload files to storage (returns dict mapping field -> list of urls)
             uploaded_urls = self.upload_document()
+            self._fetch_profile_documents(uploaded_urls)
+            
             bill_urls = uploaded_urls.get("bills", [])
             if not bill_urls:
                 bill_urls = [p for p in self.temp_paths if p]

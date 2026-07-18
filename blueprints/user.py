@@ -189,7 +189,6 @@ def claim_status():
         # Dynamic fallback to generate application form on the fly if missing
         if not claim.get("generated_application") or not claim.get("generated_application", {}).get("pdf_url"):
             try:
-                from database.mongo_client import govt_collection, users_collection
                 from services.government_application_generator import generate_and_upload_application
                 phone_digits = "".join(ch for ch in str(mobile or "") if ch.isdigit())
                 pensioner = govt_collection.find_one({"$or": [{"mobile": phone_digits}, {"phone": phone_digits}]}) or users_collection.find_one({"$or": [{"mobile": phone_digits}, {"phone": phone_digits}]}) or {}
@@ -206,7 +205,6 @@ def claim_status():
                 claim_data = {k: v for k, v in claim.items()}
                 gen_docs = generate_and_upload_application(claim_id, claim_data, photo_url=passport_photo_url)
                 if gen_docs:
-                    from database.mongo_client import claims_collection
                     claims_collection.update_one({"claim_id": claim_id}, {"$set": {"generated_application": gen_docs}})
                     claim["generated_application"] = gen_docs
             except Exception as gen_err:

@@ -41,15 +41,20 @@
                     
                     <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; align-items: center;">
                         <div style="position: relative; width: 110px; height: 110px; border-radius: var(--radius-sm); border: 2px dashed var(--border); overflow: hidden; background: var(--bg-elevated); display: flex; align-items: center; justify-content: center;">
-                            <img id="photoPreviewImg" style="width: 100%; height: 100%; object-fit: cover; display: none;" alt="Profile Photo">
-                            <div id="photoPlaceholder" class="muted" style="text-align: center; font-size: 0.8rem; padding: 0.5rem;">
+                            {% set profile_photo = profile_data.profile.profilePhoto or profile_data.profile.photo_url or profile_data.profile.photo or (profile_data.documents.profilePhoto.url if profile_data.documents.profilePhoto is mapping else profile_data.documents.profilePhoto) %}
+                            <img id="photoPreviewImg" src="{{ profile_photo or '' }}" style="width: 100%; height: 100%; object-fit: cover; {% if profile_photo %}display: block;{% else %}display: none;{% endif %}" alt="Profile Photo">
+                            <div id="photoPlaceholder" class="muted" style="text-align: center; font-size: 0.8rem; padding: 0.5rem; {% if profile_photo %}display: none;{% else %}display: block;{% endif %}">
                                 <i class="fa-solid fa-user-tie" style="font-size: 2rem; margin-bottom: 0.25rem;"></i><br>Photo
                             </div>
                         </div>
                         <div style="flex: 1; min-width: 200px;">
                             <label class="form-label">Passport Size Profile Photo</label>
                             <input type="file" name="passport_photo" id="passportPhotoInput" class="form-control" accept="image/*">
-                            <span class="muted" style="font-size: 0.8rem;">JPEG or PNG formats only.</span>
+                            {% if profile_photo %}
+                            <span class="text-success" style="font-size: 0.8rem; display: block; margin-top: 0.25rem;"><i class="fa-solid fa-circle-check"></i> Profile photo found (will be auto-fetched if left blank).</span>
+                            {% else %}
+                            <span class="muted" style="font-size: 0.8rem; display: block; margin-top: 0.25rem;">JPEG or PNG formats only. Auto-fetched if uploaded in profile.</span>
+                            {% endif %}
                         </div>
                     </div>
 
@@ -308,11 +313,21 @@
                         <div class="form-group">
                             <label class="form-label">Identity Proof (Aadhaar / Voter ID)</label>
                             <input type="file" name="id_proof" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                            {% if profile_data.documents.aadhaar or profile_data.documents.pan or profile_data.documents.voterId %}
+                            <span class="text-success" style="font-size: 0.8rem; display: block; margin-top: 0.25rem;"><i class="fa-solid fa-circle-check"></i> Identity proof found in profile (will be auto-fetched if left blank).</span>
+                            {% else %}
+                            <span class="muted" style="font-size: 0.8rem; display: block; margin-top: 0.25rem;">Auto-fetched if uploaded in profile.</span>
+                            {% endif %}
                         </div>
                         
                         <div class="form-group">
                             <label class="form-label">PPO Certificate Proof</label>
                             <input type="file" name="ppo_proof" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                            {% if profile_data.documents.ppo or profile_data.documents.bankPassbook %}
+                            <span class="text-success" style="font-size: 0.8rem; display: block; margin-top: 0.25rem;"><i class="fa-solid fa-circle-check"></i> PPO proof/passbook found in profile (will be auto-fetched if left blank).</span>
+                            {% else %}
+                            <span class="muted" style="font-size: 0.8rem; display: block; margin-top: 0.25rem;">Auto-fetched if uploaded in profile.</span>
+                            {% endif %}
                         </div>
                     </div>
 
