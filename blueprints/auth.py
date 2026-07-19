@@ -302,14 +302,15 @@ def _sync_officer_verification_state(identifier, employee, officer_doc=None):
 def _create_officer_session(officer_doc, identifier):
     officer_doc = officer_doc or {}
     identifier_mobile = _normalize_mobile(identifier)
-    document_mobile = _normalize_mobile(
-        officer_doc.get("mobile")
-        or officer_doc.get("phone")
-        or officer_doc.get("phone_number")
-    )
-    mobile = identifier_mobile if len(identifier_mobile) >= 10 else document_mobile
+    raw_mobile = officer_doc.get("mobile") or officer_doc.get("phone") or officer_doc.get("phone_number")
+    document_mobile = _normalize_mobile(raw_mobile)
+    
+    # Fallback to the raw identifier if normalizers strip everything
+    mobile = identifier_mobile if len(identifier_mobile) >= 10 else (document_mobile or raw_mobile or identifier)
+    
     session["mobile"] = mobile
-    session["user_id"] = officer_doc.get("officer_id") or mobile
+    session["user_id"] = officer_doc.get("officer_id") or officer_doc.get("employee_id") or mobile
+    session["officer_name"] = officer_doc.get("name") or officer_doc.get("full_name") or "Claims Officer"
     session["role"] = "officer"
     session["authenticated"] = True
     logger.info("[SESSION] Officer session created | officer_id=%s", session.get("user_id"))
