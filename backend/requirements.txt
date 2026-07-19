@@ -32,11 +32,12 @@ python-magic
 python-magic-bin; platform_system == "Windows"
 
 # AI and RAG
-faiss-cpu
-sentence-transformers
-transformers
-torch
-PyMuPDF
+# (Heavy local ML dependencies removed to save ~4GB of space; rag_service degrades gracefully)
+# faiss-cpu
+# sentence-transformers
+# transformers
+# torch
+# PyMuPDF
 
 # Data and reporting
 pandas
@@ -51,7 +52,6 @@ requests
 httpx>=0.27.0
 tenacity>=8.3.0
 gnani-vachana
-psycopg2-binary
 
 # Alchemyst AI SDK
 alchemystai>=0.10.0
