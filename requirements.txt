@@ -55,3 +55,9 @@ gnani-vachana
 
 # Alchemyst AI SDK
 alchemystai>=0.10.0
+
+# Additional Integrations & Workflows
+langgraph
+redis
+rq
+docx2pdf
