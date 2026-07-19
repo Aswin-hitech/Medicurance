@@ -191,10 +191,10 @@ class GovtRepository:
             "$or": [
                 {"identity.aadhaarNumber": {"$in": aadhaar_query_values}},
                 {"identity.aadhaar_number": {"$in": aadhaar_query_values}},
-                {"identity.aadhaarLast4": {"$in": aadhaar_last4_values}},
-                {"identity.aadhaar_last4": {"$in": aadhaar_last4_values}},
+                {"identity.aadhaarLast4": {"$in": aadhaar_last4_values + aadhaar_query_values}},
+                {"identity.aadhaar_last4": {"$in": aadhaar_last4_values + aadhaar_query_values}},
                 {"aadhaar_number": {"$in": aadhaar_query_values}},
-                {"aadhaar_last4": {"$in": aadhaar_last4_values}},
+                {"aadhaar_last4": {"$in": aadhaar_last4_values + aadhaar_query_values}},
             ]
         })
 

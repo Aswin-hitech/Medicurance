@@ -422,8 +422,16 @@ def generate_letter(claim_id, letter_type):
     letter_info = claim.get("generated_letters", {}).get(safe_type, {})
     url_or_path = letter_info.get("url")
 
-    if not url_or_path or not (url_or_path.startswith("http") or __import__('os').path.exists(url_or_path)):
-        url_or_path = generate_pdf_letter(claim, letter_type)
+    try:
+        if not url_or_path or not (url_or_path.startswith("http") or __import__('os').path.exists(url_or_path)):
+            url_or_path = generate_pdf_letter(claim, letter_type)
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("[User] Letter generation failed: %s", exc)
+        flash("Letter generation failed. Please try again later.", "danger")
+        if session.get("role") == "admin":
+            return redirect(url_for("admin.dashboard"))
+        return redirect(url_for("user.claim_status") if session.get("role") == "user" else url_for("officer.dashboard"))
 
     if url_or_path.startswith("http"):
         if request.args.get("download") == "1":

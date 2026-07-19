@@ -23,6 +23,7 @@ class Config:
     GNANI_API_KEY = getattr(settings, "gnani_api_key", "") or getattr(settings, "gnani_api_key_id", "")
     GNANI_BASE_URL = getattr(settings, "gnani_base_url", "https://api.vachana.ai")
     GNANI_STT_URL = getattr(settings, "gnani_stt_url", "")
+    OCR_SPACE_URL = getattr(settings, "ocr_space_url", "https://api.ocr.space/parse/image")
     GNANI_TTS_URL = getattr(settings, "gnani_tts_url", "")
     GNANI_TTS_PRODUCT = getattr(settings, "gnani_tts_product", "Gnani Timbre v2.0")
     GNANI_TTS_MODEL = getattr(settings, "gnani_tts_model", "vachana-voice-v3")
@@ -31,6 +32,22 @@ class Config:
     GNANI_LANGUAGE = getattr(settings, "gnani_language", "en-IN")
     GNANI_VOICE = getattr(settings, "gnani_voice", "Pranav")
     GNANI_AUDIO_FORMAT = getattr(settings, "gnani_audio_format", "wav")
+    GNANI_TIMEOUT = getattr(settings, "gnani_timeout", 60)
+    GNANI_DEFAULT_LANGUAGE = getattr(settings, "gnani_default_language", "en-IN")
+    GNANI_TAMIL_VOICE = getattr(settings, "gnani_tamil_voice", "Kaveri")
+    GNANI_ENGLISH_VOICE = getattr(settings, "gnani_english_voice", "Pranav")
+    # Alchemyst AI
+    ALCHEMYST_AI_API_KEY = getattr(settings, "alchemyst_ai_api_key", "")
+    ALCHEMYST_API_KEY = getattr(settings, "alchemyst_api_key", "")
+    ALCHEMYST_BASE_URL = getattr(settings, "alchemyst_base_url", "https://platform-backend.getalchemystai.com")
+    ALCHEMYST_API_BASE = getattr(settings, "alchemyst_api_base", "https://platform-backend.getalchemystai.com/api/v1/proxy")
+    ALCHEMYST_CHAT_URL = getattr(settings, "alchemyst_chat_url", "https://platform-backend.getalchemystai.com/api/v1/chat")
+    ALCHEMYST_MODEL = getattr(settings, "alchemyst_model", "alchemyst-c-01")
+    ALCHEMYST_TIMEOUT = getattr(settings, "alchemyst_timeout", 60)
+    # Chat feature flags
+    CHAT_MEMORY_ENABLED = getattr(settings, "chat_memory_enabled", True)
+    VOICE_CHAT_ENABLED = getattr(settings, "voice_chat_enabled", True)
+    CHATBOT_PROVIDER = getattr(settings, "chatbot_provider", "ALCHEMYST")
     JWT_SECRET_KEY = settings.jwt_secret_key
     JWT_EXPIRATION = settings.jwt_expiration
     JWT_ACCESS_EXP_MINUTES = settings.jwt_access_exp_minutes
@@ -40,9 +57,9 @@ class Config:
     JWT_COOKIE_NAME = settings.jwt_cookie_name
     JWT_REFRESH_COOKIE_NAME = settings.jwt_refresh_cookie_name
     JWT_ISSUER = settings.jwt_issuer
-    MSG91_API_KEY = settings.msg91_api_key
-    MSG91_TEMPLATE_ID = settings.msg91_template_id
-    MSG91_SENDER_ID = settings.msg91_sender_id
+    TWILIO_ACCOUNT_SID = getattr(settings, "twilio_account_sid", "")
+    TWILIO_AUTH_TOKEN = getattr(settings, "twilio_auth_token", "")
+    TWILIO_PHONE_NUMBER = getattr(settings, "twilio_phone_number", "")
     OTP_EXPIRY = settings.otp_expiry
     UPLOAD_MAX_SIZE = settings.upload_max_size
     FILE_ALLOWED_EXTENSIONS = settings.allowed_extensions_set
@@ -68,7 +85,7 @@ class Config:
     NHIS_ALLOWED_NETLOCS = settings.nhis_allowed_netlocs_set
     NHIS_ALLOWED_PREFIXES = settings.nhis_allowed_prefixes_tuple
     OCR_SPACE_URL = settings.ocr_space_url
-    MSG91_API_URL = settings.msg91_api_url
+
 
     @classmethod
     def validate(cls):

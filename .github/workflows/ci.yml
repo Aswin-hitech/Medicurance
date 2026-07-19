@@ -42,7 +42,7 @@ jobs:
           SUPABASE_URL: https://example.supabase.co
           SUPABASE_SECRET_KEY: test
           SUPABASE_API_KEY: test
-          MSG91_API_KEY: test
-          MSG91_TEMPLATE_ID: test
-          MSG91_SENDER_ID: test
+          TWILIO_ACCOUNT_SID: test
+          TWILIO_AUTH_TOKEN: test
+          TWILIO_PHONE_NUMBER: test
         run: python -m unittest -q tests.test_phase2_security

@@ -389,6 +389,44 @@ def retrieve_rules(query: str, k: int = 5) -> List[Dict[str, Any]]:
     return results
 
 
+def retrieve_context_for_chat(query: str, k: int = 5) -> List[Dict[str, Any]]:
+    """
+    Retrieve relevant government annexure chunks for the Alchemyst chatbot.
+
+    Thin wrapper around retrieve_rules() that ensures the returned dicts
+    always contain the 'text' key (aliased from 'matched_rule') for
+    compatibility with alchemyst_service.py's _build_context_block().
+
+    Does NOT modify the existing retrieve_rules() function or rag_validate().
+
+    Args:
+        query: The user's question (in English for best embedding match).
+        k:     Number of chunks to retrieve (default 5).
+
+    Returns:
+        List of dicts with keys: chunk_id, matched_rule, text, source_document, confidence.
+    """
+    query = str(query or "").strip()
+    if not query:
+        logger.debug("[RAG Chat] Empty query — returning no context.")
+        return []
+
+    try:
+        raw_results = retrieve_rules(query, k=k)
+        # Ensure 'text' key is present (alias for matched_rule) for alchemyst_service
+        enriched = []
+        for doc in raw_results:
+            item = dict(doc)
+            item.setdefault("text", item.get("matched_rule", ""))
+            enriched.append(item)
+        logger.debug("[RAG Chat] Retrieved %d context chunks for query: %s", len(enriched), query[:100])
+        return enriched
+    except Exception as exc:
+        logger.warning("[RAG Chat] retrieve_context_for_chat failed: %s", exc)
+        return []
+
+
+
 REQUIRED_KEYS = {
     "eligibility", "confidence", "risk_level", "fraud_score",
     "hospital_verified", "reasoning", "recommended_action",
@@ -424,15 +462,15 @@ def _clean_llm_response(raw: str) -> str:
 def _recover_json(raw: str):
     try:
         return json.loads(raw)
-    except json.JSONDecodeError:
-        pass
+    except json.JSONDecodeError as exc:
+        logger.warning("[RAG] Direct JSON decode failed: %s", exc)
 
     match = re.search(r"\{.*\}", raw, re.DOTALL)
     if match:
         try:
             return json.loads(match.group())
-        except json.JSONDecodeError:
-            pass
+        except json.JSONDecodeError as exc:
+            logger.warning("[RAG] Embedded JSON decode failed: %s", exc)
 
     return None
 

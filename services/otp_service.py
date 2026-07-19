@@ -9,65 +9,55 @@ class OtpService:
     def __init__(self, otp_collection):
         self.otp_collection = otp_collection
 
-    def _is_dev_mode(self):
-        return str(Config.FLASK_ENV).lower() == "development"
-
     def generate_otp(self):
         """Generate a cryptographically secure 6-digit numeric OTP."""
         digits = string.digits
         return ''.join(secrets.choice(digits) for _ in range(6))
 
     def send_sms_otp(self, mobile, otp):
-        # Future Twilio integration point:
-        # replace this MSG91 transport with Twilio Verify/SMS once production OTP delivery is enabled.
-        if not self._is_dev_mode():
-            return {"status": "skipped", "message": "OTP delivery disabled outside development"}
+        """Send OTP via Twilio REST API."""
+        if not Config.TWILIO_ACCOUNT_SID or not Config.TWILIO_AUTH_TOKEN or not Config.TWILIO_PHONE_NUMBER:
+            return {"status": "skipped", "message": "Twilio not configured"}
 
-        if not Config.MSG91_API_KEY:
-            return {"status": "skipped", "message": "No API key configured"}
-
-        url = Config.MSG91_API_URL
-
+        url = f"https://api.twilio.com/2010-04-01/Accounts/{Config.TWILIO_ACCOUNT_SID}/Messages.json"
+        
         payload = {
-            "template_id": Config.MSG91_TEMPLATE_ID,
-            "sender": Config.MSG91_SENDER_ID,
-            "short_url": "0",
-            "mobiles": f"91{mobile}",
-            "OTP": otp
-        }
-
-        headers = {
-            "authkey": Config.MSG91_API_KEY,
-            "Content-Type": "application/json"
+            "To": f"+91{mobile}",
+            "From": Config.TWILIO_PHONE_NUMBER,
+            "Body": f"Your Medicurance OTP is {otp}"
         }
 
         try:
             import requests
-            response = requests.post(url, json=payload, headers=headers, timeout=10)
+            response = requests.post(
+                url, 
+                data=payload, 
+                auth=(Config.TWILIO_ACCOUNT_SID, Config.TWILIO_AUTH_TOKEN),
+                timeout=10
+            )
             return response.json()
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
     def store_otp(self, mobile):
-        """Generate, store, and trigger sending of OTP in development only."""
+        """Generate, store, and trigger sending of OTP."""
         otp = self.generate_otp()
+        
+        print(f"\n[OTP Service] Generated OTP for {mobile}: {otp}\n")
 
-        if self._is_dev_mode():
-            # Keep OTP persistence lightweight and dev-only so production data stays clean.
-            self.otp_collection.update_one(
-                {"mobile": mobile},
-                {
-                    "$set": {
-                        "mobile": mobile,
-                        "otp": otp,
-                        "timestamp": time.time(),
-                        "attempts": 0
-                    }
-                },
-                upsert=True
-            )
+        self.otp_collection.update_one(
+            {"mobile": mobile},
+            {
+                "$set": {
+                    "mobile": mobile,
+                    "otp": otp,
+                    "timestamp": time.time(),
+                    "attempts": 0
+                }
+            },
+            upsert=True
+        )
 
-        # Trigger SMS only in dev; production SMS wiring can be switched to Twilio later.
         self.send_sms_otp(mobile, otp)
 
         return otp
@@ -77,9 +67,6 @@ class OtpService:
         Verify OTP with brute-force protection and expiration check.
         Returns (is_valid, error_message)
         """
-        if not self._is_dev_mode():
-            return False, "OTP verification is disabled outside development mode."
-
         record = self.otp_collection.find_one({"mobile": mobile})
 
         if not record:

@@ -19,9 +19,9 @@ class Config:
     OCR_SPACE_API_KEY = settings.ocr_space_api_key
     JWT_SECRET_KEY = settings.jwt_secret_key
     JWT_EXPIRATION = settings.jwt_expiration
-    MSG91_API_KEY = settings.msg91_api_key
-    MSG91_TEMPLATE_ID = settings.msg91_template_id
-    MSG91_SENDER_ID = settings.msg91_sender_id
+    TWILIO_ACCOUNT_SID = getattr(settings, "twilio_account_sid", "")
+    TWILIO_AUTH_TOKEN = getattr(settings, "twilio_auth_token", "")
+    TWILIO_PHONE_NUMBER = getattr(settings, "twilio_phone_number", "")
     OTP_EXPIRY = settings.otp_expiry
     UPLOAD_MAX_SIZE = settings.upload_max_size
     FILE_ALLOWED_EXTENSIONS = settings.allowed_extensions_set

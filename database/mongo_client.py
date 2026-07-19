@@ -138,6 +138,7 @@ email_verifications_collection = db["email_verifications"]
 rag_chunks_collection = db["rag_chunks"]
 access_requests_collection = db["access_requests"]
 chat_history_collection = db["chat_history"]
+chat_conversations_collection = db["chat_conversations"]  # Persistent Alchemyst multi-turn memory
 # Advanced Indexing
 if MONGO_AVAILABLE:
     _safe_create_index(users_collection, "mobile", unique=True)
@@ -195,6 +196,10 @@ if MONGO_AVAILABLE:
     _safe_create_index(access_requests_collection, "created_at")
     _safe_create_index(notifications_collection, "claim_id")
     _safe_create_index(notifications_collection, "created_at")
+    # Alchemyst conversation memory indexes
+    _safe_create_index(chat_conversations_collection, "conversation_id", unique=True)
+    _safe_create_index(chat_conversations_collection, "user_id")
+    _safe_create_index(chat_conversations_collection, "updated_at")
 
     if Config.FLASK_ENV == "development" and admins_collection.count_documents({}) == 0:
         import bcrypt

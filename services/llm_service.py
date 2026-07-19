@@ -22,6 +22,10 @@ def _fallback_response(reason):
 
 
 def ask_llm(prompt, json_mode=False):
+    if not getattr(Config, "GROQ_API_KEY", ""):
+        logger.error("[LLM] Missing GROQ_API_KEY. Aborting request.")
+        return _fallback_response("Missing GROQ_API_KEY")
+
     try:
         import requests
     except Exception as exc:
@@ -99,3 +103,125 @@ def ask_llm(prompt, json_mode=False):
                 getattr(response, "text", "")[:1000],
             )
         return _fallback_response(str(exc)[:120])
+
+
+# ---------------------------------------------------------------------------
+# Chatbot LLM router — routes to Alchemyst (or Groq fallback)
+# DO NOT use this function in the claim processing pipeline.
+# Use ask_llm() for all claim/rag validation tasks.
+# ---------------------------------------------------------------------------
+def _groq_chat_fallback(
+    messages: "list[dict]",
+    rag_chunks: "list[dict]",
+    language: str,
+) -> "dict":
+    """
+    Emergency Groq fallback for the chatbot when Alchemyst is unavailable.
+    Builds a simple single-turn prompt from the last user message + context.
+    Returns a dict compatible with AlchemystResponse fields.
+    """
+    import re as _re
+
+    history_lines = []
+    for m in messages:
+        role = str(m.get("role", "")).upper()
+        content = str(m.get("content", "")).strip()
+        if content:
+            history_lines.append(f"{role}: {content}")
+    history_text = "\n".join(history_lines)
+
+    context = "\n\n".join(
+        f"Source: {c.get('source_document', '')}\nRule: {c.get('matched_rule') or c.get('text', '')}"
+        for c in (rag_chunks or [])[:5]
+    )
+    lang_note = "Respond in Tamil." if language == "ta-IN" else "Respond in English."
+    prompt = (
+        f"You are a medical AI assistant for Tamil Nadu Government's NHIS/CMCHIS scheme.\n"
+        f"{lang_note}\n\n"
+        f"CONTEXT:\n{context}\n\n"
+        f"CONVERSATION HISTORY:\n{history_text}\n\n"
+        f"Return ONLY valid JSON:\n"
+        f'{{\"answer\": \"<your answer>\", \"follow_up_questions\": [\"...\", \"...\"], \"sources_used\": []}}'
+    )
+    raw = ask_llm(prompt, json_mode=True)
+    # Parse
+    raw = _re.sub(r"^```(?:json)?", "", raw, flags=_re.MULTILINE).strip()
+    raw = _re.sub(r"```$", "", raw, flags=_re.MULTILINE).strip()
+    try:
+        import json as _json
+        data = _json.loads(raw)
+        return {
+            "answer": data.get("answer", ""),
+            "follow_up_questions": data.get("follow_up_questions", []),
+            "sources_used": data.get("sources_used", []),
+            "success": True,
+            "error": "",
+        }
+    except Exception:
+        return {
+            "answer": raw or "An error occurred generating a response.",
+            "follow_up_questions": [],
+            "sources_used": [],
+            "success": bool(raw),
+            "error": "JSON parse failed on Groq fallback",
+        }
+
+
+def ask_chatbot_llm(
+    messages: "list[dict]",
+    rag_chunks: "list[dict] | None" = None,
+    language: str = "en-IN",
+    metadata: "dict | None" = None,
+) -> "dict":
+    """
+    Primary entry point for the AI chatbot reasoning layer.
+
+    Routes to Alchemyst AI when CHATBOT_PROVIDER=ALCHEMYST (default).
+    Falls back to Groq if Alchemyst is unavailable or misconfigured.
+
+    Args:
+        messages:   OpenAI-format message list [{role, content}].
+        rag_chunks: Retrieved annexure chunks from RAG retrieval.
+        language:   "en-IN" or "ta-IN".
+        metadata:   Optional extra context (claim_id, trust_score, etc.).
+
+    Returns:
+        Dict with keys: answer, follow_up_questions, sources_used, success, error.
+        Never raises.
+    """
+    provider = str(getattr(Config, "CHATBOT_PROVIDER", "ALCHEMYST") or "ALCHEMYST").strip().upper()
+
+    if provider == "ALCHEMYST":
+        try:
+            from services.alchemyst_service import ask_alchemyst, AlchemystResponse
+            result: AlchemystResponse = ask_alchemyst(
+                messages=messages,
+                rag_chunks=rag_chunks or [],
+                language=language,
+                metadata=metadata,
+            )
+            if result.success and result.answer:
+                logger.info(
+                    "[Chatbot] Alchemyst responded | latency_ms=%.1f | tokens=%s",
+                    result.latency_ms,
+                    result.token_usage.get("total_tokens", "?"),
+                )
+                return {
+                    "answer": result.answer,
+                    "follow_up_questions": result.follow_up_questions,
+                    "sources_used": result.sources_used,
+                    "success": True,
+                    "error": "",
+                }
+            else:
+                logger.warning(
+                    "[Chatbot] Alchemyst call failed (%s) — falling back to Groq.",
+                    result.error,
+                )
+        except Exception as exc:
+            logger.error("[Chatbot] Alchemyst import/call error: %s — falling back to Groq.", exc)
+
+    # Groq fallback
+    logger.info("[Chatbot] Using Groq fallback for chatbot response.")
+    return _groq_chat_fallback(messages, rag_chunks or [], language)
+

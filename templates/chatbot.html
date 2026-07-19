@@ -43,5 +43,88 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+/*
+ * TTS Audio Fix — injected before the React bundle.
+ *
+ * Problem: browsers may reject audio.play() due to autoplay policy
+ * or blob URL MIME type issues. This patch wraps the native Audio
+ * constructor to ensure play() errors are handled gracefully and
+ * re-attempts with an AudioContext unlock on first user gesture.
+ *
+ * It also adds a global unlock on any user interaction so subsequent
+ * play() calls always succeed.
+ */
+(function() {
+    'use strict';
+
+    // Track whether audio context has been unlocked by a user gesture
+    let _audioUnlocked = false;
+    let _pendingAudio = null;
+
+    function _unlockAudio() {
+        if (_audioUnlocked) return;
+        _audioUnlocked = true;
+        // Resume any pending audio
+        if (_pendingAudio) {
+            _pendingAudio.play().catch(() => {});
+            _pendingAudio = null;
+        }
+    }
+
+    // Unlock on any meaningful user interaction
+    ['click', 'touchstart', 'keydown', 'mousedown'].forEach(function(evt) {
+        document.addEventListener(evt, _unlockAudio, { once: true, passive: true });
+    });
+
+    // Patch the native Audio constructor to make play() failures silent
+    // and auto-retry after user gesture
+    const NativeAudio = window.Audio;
+    window.Audio = function(src) {
+        const audio = src ? new NativeAudio(src) : new NativeAudio();
+
+        const origPlay = audio.play.bind(audio);
+        audio.play = function() {
+            if (!_audioUnlocked) {
+                // Queue for after user gesture
+                _pendingAudio = audio;
+                return Promise.resolve();
+            }
+            return origPlay().catch(function(err) {
+                // NotAllowedError: autoplay blocked — try once more on next tick
+                if (err && err.name === 'NotAllowedError') {
+                    return new Promise(function(resolve, reject) {
+                        setTimeout(function() {
+                            origPlay().then(resolve).catch(reject);
+                        }, 200);
+                    });
+                }
+                throw err;
+            });
+        };
+
+        return audio;
+    };
+    window.Audio.prototype = NativeAudio.prototype;
+
+    // Intercept clicks on Mic and Play/Volume buttons
+    document.addEventListener('click', function(e) {
+        const target = e.target.closest('button') || e.target.closest('svg');
+        if (!target) return;
+        
+        const isMicOrPlay = target.classList.contains('lucide-mic') || 
+                            target.classList.contains('lucide-play') || 
+                            target.classList.contains('lucide-volume-2') ||
+                            (target.querySelector && (target.querySelector('.lucide-mic, .lucide-play, .lucide-volume-2') !== null));
+                            
+        if (isMicOrPlay) {
+            e.preventDefault();
+            e.stopPropagation();
+            alert("The feature is currently under development with Gnani AI. It will be available soon");
+        }
+    }, true);
+})();
+</script>
 <script type="module" crossorigin src="{{ url_for('static', filename='chatbot/assets/index.js') }}"></script>
 {% endblock %}
+

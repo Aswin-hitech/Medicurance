@@ -60,6 +60,24 @@ class AppSettings(BaseSettings):  # type: ignore[misc]
         gnani_tts_voice: str = Field(default="Pranav", alias="GNANI_TTS_VOICE")
         gnani_language: str = Field(default="en-IN", alias="GNANI_LANGUAGE")
         gnani_voice: str = Field(default="Pranav", alias="GNANI_VOICE")
+        gnani_timeout: int = Field(default=60, alias="GNANI_TIMEOUT")
+        gnani_default_language: str = Field(default="en-IN", alias="GNANI_DEFAULT_LANGUAGE")
+        gnani_tamil_voice: str = Field(default="Kaveri", alias="GNANI_TAMIL_VOICE")
+        gnani_english_voice: str = Field(default="Pranav", alias="GNANI_ENGLISH_VOICE")
+
+        # Alchemyst AI
+        alchemyst_ai_api_key: str = Field(default="", alias="ALCHEMYST_AI_API_KEY")
+        alchemyst_api_key: str = Field(default="", alias="ALCHEMYST_API_KEY")
+        alchemyst_base_url: str = Field(default="https://platform-backend.getalchemystai.com", alias="ALCHEMYST_BASE_URL")
+        alchemyst_api_base: str = Field(default="https://platform-backend.getalchemystai.com/api/v1/proxy", alias="ALCHEMYST_API_BASE")
+        alchemyst_chat_url: str = Field(default="https://platform-backend.getalchemystai.com/api/v1/chat", alias="ALCHEMYST_CHAT_URL")
+        alchemyst_model: str = Field(default="alchemyst-c-01", alias="ALCHEMYST_MODEL")
+        alchemyst_timeout: int = Field(default=60, alias="ALCHEMYST_TIMEOUT")
+
+        # Chat feature flags
+        chat_memory_enabled: bool = Field(default=True, alias="CHAT_MEMORY_ENABLED")
+        voice_chat_enabled: bool = Field(default=True, alias="VOICE_CHAT_ENABLED")
+        chatbot_provider: str = Field(default="ALCHEMYST", alias="CHATBOT_PROVIDER")
         gnani_audio_format: str = Field(default="wav", alias="GNANI_AUDIO_FORMAT")
 
         jwt_secret_key: str = Field(default="", alias="JWT_SECRET_KEY")
@@ -71,10 +89,10 @@ class AppSettings(BaseSettings):  # type: ignore[misc]
         jwt_cookie_name: str = Field(default="medicurance_access_token", alias="JWT_COOKIE_NAME")
         jwt_refresh_cookie_name: str = Field(default="medicurance_refresh_token", alias="JWT_REFRESH_COOKIE_NAME")
         jwt_issuer: str = Field(default="medicurance", alias="JWT_ISSUER")
-
-        msg91_api_key: str = Field(default="", alias="MSG91_API_KEY")
-        msg91_template_id: str = Field(default="", alias="MSG91_TEMPLATE_ID")
-        msg91_sender_id: str = Field(default="", alias="MSG91_SENDER_ID")
+        # Twilio (Optional)
+        twilio_account_sid: str = Field(default="", alias="TWILIO_ACCOUNT_SID")
+        twilio_auth_token: str = Field(default="", alias="TWILIO_AUTH_TOKEN")
+        twilio_phone_number: str = Field(default="", alias="TWILIO_PHONE_NUMBER")
         otp_expiry: int = Field(default=300, alias="OTP_EXPIRY")
 
         upload_max_size: int = Field(default=15 * 1024 * 1024, alias="UPLOAD_MAX_SIZE")
@@ -106,7 +124,7 @@ class AppSettings(BaseSettings):  # type: ignore[misc]
         nhis_allowed_netlocs: str = Field(default="tnnhis2018.in,www.tnnhis2018.in", alias="NHIS_ALLOWED_NETLOCS")
         nhis_allowed_prefixes: str = Field(default="/TNEMPLOYEE/,/TNEMPLOYEE/TNPolInfo.aspx", alias="NHIS_ALLOWED_PREFIXES")
         ocr_space_url: str = Field(default="https://api.ocr.space/parse/image", alias="OCR_SPACE_URL")
-        msg91_api_url: str = Field(default="https://control.msg91.com/api/v5/sms", alias="MSG91_API_URL")
+
 
         model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -141,6 +159,22 @@ class AppSettings(BaseSettings):  # type: ignore[misc]
             self.gnani_language = os.getenv("GNANI_LANGUAGE", "en-IN")
             self.gnani_voice = os.getenv("GNANI_VOICE", "Pranav")
             self.gnani_audio_format = os.getenv("GNANI_AUDIO_FORMAT", "wav")
+            self.gnani_timeout = _env_int("GNANI_TIMEOUT", 60)
+            self.gnani_default_language = os.getenv("GNANI_DEFAULT_LANGUAGE", "en-IN")
+            self.gnani_tamil_voice = os.getenv("GNANI_TAMIL_VOICE", "Kaveri")
+            self.gnani_english_voice = os.getenv("GNANI_ENGLISH_VOICE", "Pranav")
+            # Alchemyst AI
+            self.alchemyst_ai_api_key = os.getenv("ALCHEMYST_AI_API_KEY", "")
+            self.alchemyst_api_key = os.getenv("ALCHEMYST_API_KEY", self.alchemyst_ai_api_key)
+            self.alchemyst_base_url = os.getenv("ALCHEMYST_BASE_URL", "https://platform-backend.getalchemystai.com")
+            self.alchemyst_api_base = os.getenv("ALCHEMYST_API_BASE", "https://platform-backend.getalchemystai.com/api/v1/proxy")
+            self.alchemyst_chat_url = os.getenv("ALCHEMYST_CHAT_URL", "https://platform-backend.getalchemystai.com/api/v1/chat")
+            self.alchemyst_model = os.getenv("ALCHEMYST_MODEL", "alchemyst-c-01")
+            self.alchemyst_timeout = _env_int("ALCHEMYST_TIMEOUT", 60)
+            # Chat feature flags
+            self.chat_memory_enabled = _env_bool("CHAT_MEMORY_ENABLED", True)
+            self.voice_chat_enabled = _env_bool("VOICE_CHAT_ENABLED", True)
+            self.chatbot_provider = os.getenv("CHATBOT_PROVIDER", "ALCHEMYST")
             self.jwt_secret_key = os.getenv("JWT_SECRET_KEY") or self.secret_key
             self.jwt_expiration = _env_int("JWT_EXPIRATION", 86400)
             self.jwt_access_exp_minutes = _env_int("JWT_ACCESS_EXP_MINUTES", 15)
@@ -150,9 +184,10 @@ class AppSettings(BaseSettings):  # type: ignore[misc]
             self.jwt_cookie_name = os.getenv("JWT_COOKIE_NAME", "medicurance_access_token")
             self.jwt_refresh_cookie_name = os.getenv("JWT_REFRESH_COOKIE_NAME", "medicurance_refresh_token")
             self.jwt_issuer = os.getenv("JWT_ISSUER", "medicurance")
-            self.msg91_api_key = os.getenv("MSG91_API_KEY", "")
-            self.msg91_template_id = os.getenv("MSG91_TEMPLATE_ID", "")
-            self.msg91_sender_id = os.getenv("MSG91_SENDER_ID", "")
+            # Twilio (Optional)
+            self.twilio_account_sid = os.getenv("TWILIO_ACCOUNT_SID", "")
+            self.twilio_auth_token = os.getenv("TWILIO_AUTH_TOKEN", "")
+            self.twilio_phone_number = os.getenv("TWILIO_PHONE_NUMBER", "")
             self.otp_expiry = _env_int("OTP_EXPIRY", 300)
             self.upload_max_size = _env_int("UPLOAD_MAX_SIZE", 15 * 1024 * 1024)
             self.file_allowed_extensions = os.getenv("FILE_ALLOWED_EXTENSIONS", "pdf,png,jpg,jpeg")
@@ -180,7 +215,7 @@ class AppSettings(BaseSettings):  # type: ignore[misc]
             self.nhis_allowed_netlocs = os.getenv("NHIS_ALLOWED_NETLOCS", "tnnhis2018.in,www.tnnhis2018.in")
             self.nhis_allowed_prefixes = os.getenv("NHIS_ALLOWED_PREFIXES", "/TNEMPLOYEE/,/TNEMPLOYEE/TNPolInfo.aspx")
             self.ocr_space_url = os.getenv("OCR_SPACE_URL", "https://api.ocr.space/parse/image")
-            self.msg91_api_url = os.getenv("MSG91_API_URL", "https://control.msg91.com/api/v5/sms")
+
 
     @property
     def allowed_extensions_set(self) -> Set[str]:

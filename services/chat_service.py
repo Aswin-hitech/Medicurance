@@ -1,12 +1,42 @@
-import json
+"""
+services/chat_service.py
+AI Chatbot service — Alchemyst-powered conversational reasoning with persistent memory.
+
+Pipeline:
+  1. Small-talk guard (lightweight, no AI needed)
+  2. Tamil → English translation for RAG embedding search (still uses ask_llm/Groq — utility only)
+  3. retrieve_context_for_chat() — FAISS vector retrieval of government annexure chunks
+  4. load_conversation() — fetch persistent multi-turn history from MongoDB
+  5. format_messages_for_alchemyst() — build OpenAI-format message list
+  6. ask_chatbot_llm() → Alchemyst AI (with Groq fallback) — conversational reasoning
+  7. append_turn() + save_conversation() — persist memory to MongoDB
+  8. Return (answer, used_docs, follow_up_questions)
+
+IMPORTANT: The existing claim processing pipeline (rag_validate, ask_llm) is NOT modified.
+"""
+from __future__ import annotations
+
 import logging
-from typing import List, Dict, Any, Tuple
-from services.rag_service import retrieve_rules
-from services.llm_service import ask_llm
+from typing import Any, Dict, List, Optional, Tuple
+
+from config.settings import Config
+from services.rag_service import retrieve_context_for_chat
+from services.llm_service import ask_llm, ask_chatbot_llm
+from services.conversation_memory_service import (
+    load_conversation,
+    save_conversation,
+    append_turn,
+    format_messages_for_alchemyst,
+    get_or_create_conversation_id,
+    _extract_medical_topic,
+)
 
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# Small-talk patterns (unchanged from original)
+# ---------------------------------------------------------------------------
 _SMALL_TALK_PATTERNS = [
     "hi", "hello", "hey", "namaste", "thanks", "thank you", "thx",
     "வணக்கம்", "ஹாய்", "நன்றி", "hello there", "good morning", "good afternoon", "good evening"
@@ -18,7 +48,10 @@ def _is_small_talk(query: str) -> bool:
     if not text:
         return False
     if any(pattern in text for pattern in _SMALL_TALK_PATTERNS):
-        return len(text.split()) <= 6 or text in {"hi", "hello", "hey", "thanks", "thank you", "thankyou", "வணக்கம்", "நன்றி"}
+        return len(text.split()) <= 6 or text in {
+            "hi", "hello", "hey", "thanks", "thank you", "thankyou",
+            "வணக்கம்", "நன்றி"
+        }
     return False
 
 
@@ -30,21 +63,13 @@ def _small_talk_response(language: str, query: str) -> str:
         return "வணக்கம்! நான் உங்கள் AI பென்ஷன் உதவியாளர். உங்கள் கோரிக்கை, தகுதி, அல்லது அடுத்த படிகள் பற்றி நான் உதவ முடியும்."
     if any(word in text for word in ["நன்றி", "thanks", "thank you", "thankyou"]):
         return "You're very welcome. I'm here to help with eligibility, documents, claims, or next steps."
-    return "Hello! I’m your AI Pension Assistant. I can help with eligibility, required documents, claims, and next steps."
+    return "Hello! I'm your AI Pension Assistant. I can help with eligibility, required documents, claims, and next steps."
 
 
 def _default_follow_ups(language: str) -> List[str]:
     if language == "ta-IN":
-        return [
-            "தகுதி உள்ளதா?",
-            "தேவையான ஆவணங்கள் என்ன?",
-            "அடுத்த படி என்ன?",
-        ]
-    return [
-        "Check eligibility",
-        "Required docs",
-        "Next steps",
-    ]
+        return ["தகுதி உள்ளதா?", "தேவையான ஆவணங்கள் என்ன?", "அடுத்த படி என்ன?"]
+    return ["Check eligibility", "Required docs", "Next steps", "Explain my trust score"]
 
 
 def _normalize_follow_ups(items: List[str], language: str) -> List[str]:
@@ -67,92 +92,181 @@ def _normalize_follow_ups(items: List[str], language: str) -> List[str]:
             seen.add(fallback.lower())
     return cleaned[:4]
 
-def process_chat_query(query: str, history: List[Dict[str, str]] = None, language: str = "en-IN") -> Tuple[str, List[Dict[str, Any]], List[str]]:
+
+# ---------------------------------------------------------------------------
+# Tamil → English translation for RAG search (uses Groq — utility, not chatbot)
+# ---------------------------------------------------------------------------
+def _translate_for_rag(query: str, language: str) -> str:
     """
-    Process a chat query using RAG and LLM.
-    Returns: (answer_text, retrieved_sources)
+    Translate a Tamil query to English for better FAISS embedding search.
+    Falls back to the original query on any error.
     """
-    if not query.strip():
+    if language != "ta-IN":
+        return query
+    try:
+        prompt = (
+            "Translate the following Tamil text to English for a search query. "
+            "Return ONLY the English translation without any extra words or markdown:\n\n"
+            f"{query}"
+        )
+        english_query = ask_llm(prompt, json_mode=False)
+        if english_query and not english_query.startswith("{"):
+            translated = english_query.strip()
+            logger.info("[Chat] Translated Tamil query for RAG: %s", translated[:100])
+            return translated
+    except Exception as exc:
+        logger.warning("[Chat] Tamil translation failed: %s", exc)
+    return query
+
+
+# ---------------------------------------------------------------------------
+# Main chatbot entry point
+# ---------------------------------------------------------------------------
+def process_chat_query(
+    query: str,
+    history: Optional[List[Dict[str, str]]] = None,
+    language: str = "en-IN",
+    conversation_id: Optional[str] = None,
+    user_id: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> Tuple[str, List[Dict[str, Any]], List[str]]:
+    """
+    Process a chat query using RAG retrieval + Alchemyst AI with persistent memory.
+
+    Args:
+        query:           The user's text question.
+        history:         Legacy short-term history list [{sender, text}] from the caller.
+                         Kept for backward compatibility; persistent memory takes precedence.
+        language:        "en-IN" or "ta-IN".
+        conversation_id: UUID identifying the conversation session (optional).
+        user_id:         User identifier for memory scoping (optional).
+        metadata:        Optional claim context dict for Alchemyst system prompt enrichment.
+
+    Returns:
+        Tuple of (answer_text, used_docs, follow_up_questions).
+        Never raises — all errors result in a graceful fallback response.
+    """
+    query = (query or "").strip()
+
+    # --- Guard: empty query ---
+    if not query:
         return "Please provide a valid question.", [], _default_follow_ups(language)
 
+    # --- Guard: small talk ---
     if _is_small_talk(query):
+        logger.info("[Chat] Small-talk detected — returning canned response.")
         return _small_talk_response(language, query), [], _default_follow_ups(language)
 
-    search_query = query
-    if language == "ta-IN":
-        try:
-            translation_prompt = f"Translate the following Tamil text to English for a search query. Return ONLY the English translation without any extra words or markdown:\n\n{query}"
-            english_query = ask_llm(translation_prompt, json_mode=False)
-            if english_query and not english_query.startswith("{"):  # check it's not a fallback json
-                search_query = english_query.strip()
-                logger.info(f"Translated Tamil query to English for RAG: {search_query}")
-        except Exception as e:
-            logger.error(f"Failed to translate Tamil query: {e}")
+    # --- Step 1: Translate Tamil query for RAG embedding search ---
+    search_query = _translate_for_rag(query, language)
 
-    # 1. Retrieve knowledge using the (translated) search query
-    docs = retrieve_rules(search_query, k=5)
-    
-    if not docs:
-        return "The requested information is not available in the indexed Government knowledge base.", [], _default_follow_ups(language)
+    # --- Step 2: RAG retrieval ---
+    rag_chunks = retrieve_context_for_chat(search_query, k=5)
+    logger.info("[Chat] RAG retrieved %d chunks for query: %s", len(rag_chunks), search_query[:80])
 
-    # 2. Build context
-    context_parts = []
-    for doc in docs:
-        context_parts.append(f"Source: {doc['source_document']} (ID: {doc['chunk_id']})\nRule: {doc['matched_rule']}")
-    
-    context = "\n\n".join(context_parts)
+    if not rag_chunks:
+        logger.warning("[Chat] No RAG chunks retrieved — proceeding without context.")
 
-    # 3. Build Prompt
-    history_str = ""
-    if history:
-        history_str = "Chat History:\n" + "\n".join([f"{msg['sender']}: {msg['text']}" for msg in history[-4:]]) + "\n\n"
+    # --- Step 3: Load persistent conversation memory ---
+    memory_enabled = bool(getattr(Config, "CHAT_MEMORY_ENABLED", True))
+    conv_id = get_or_create_conversation_id(conversation_id, user_id)
+    conversation = {}
 
-    lang_instruction = "IMPORTANT: You MUST write your 'answer' in Tamil language." if language == "ta-IN" else "IMPORTANT: You MUST write your 'answer' in English language."
+    if memory_enabled:
+        conversation = load_conversation(conv_id, user_id)
+        logger.debug(
+            "[Chat] Loaded conversation | id=%s | prior_messages=%d | topic=%s",
+            conv_id,
+            len(conversation.get("messages", [])),
+            conversation.get("last_medical_topic", ""),
+        )
 
-    prompt = f"""You are the AI Pension Assistant for the Government of Tamil Nadu (Medicurance).
-Your goal is to answer the user's question STRICTLY based on the provided Government Scheme Rules.
-Do NOT hallucinate. Do NOT use outside knowledge. If the answer is not in the rules, say "The requested information is not available in the indexed Government knowledge base."
-{lang_instruction}
-Be warm, friendly, and conversational when the user greets you or says thanks.
-Always make the response interactive and helpful. Add 2 to 4 short follow-up suggestions the user can tap next.
-If the user's language is Tamil, keep follow-up suggestions in Tamil. If English, keep them in English.
+    # --- Step 4: Build message list for Alchemyst ---
+    if memory_enabled and conversation.get("messages"):
+        # Use persistent memory as the message history
+        messages = format_messages_for_alchemyst(conversation, query)
+    else:
+        # Fall back to legacy short-term history from caller
+        messages = []
+        for h in (history or [])[-_MAX_LEGACY_HISTORY:]:
+            role = "user" if h.get("sender") == "user" else "assistant"
+            content = str(h.get("text") or "").strip()
+            if content:
+                messages.append({"role": role, "content": content})
+        messages.append({"role": "user", "content": query})
 
-GOVERNMENT SCHEME RULES:
-{context}
+    # --- Step 5: Call Alchemyst (or Groq fallback) ---
+    logger.info(
+        "[Chat] Calling chatbot LLM | provider=%s | language=%s | messages=%d | rag_chunks=%d",
+        getattr(Config, "CHATBOT_PROVIDER", "ALCHEMYST"), language,
+        len(messages), len(rag_chunks),
+    )
 
-{history_str}
-USER QUESTION: {query}
+    llm_result = ask_chatbot_llm(
+        messages=messages,
+        rag_chunks=rag_chunks,
+        language=language,
+        metadata=metadata,
+    )
 
-Return ONLY valid JSON with NO markdown and NO explanation:
-{{
-  "answer": "<your detailed answer using markdown>",
-  "sources_used": ["<list of chunk_ids from the rules that you actually used to answer>"],
-  "follow_up_questions": ["<short clickable follow-up suggestion>"]
-}}"""
+    answer = str(llm_result.get("answer") or "").strip()
+    follow_up_raw = llm_result.get("follow_up_questions") or []
+    sources_used_ids = set(llm_result.get("sources_used") or [])
 
-    # 4. Ask LLM
-    try:
-        raw_response = ask_llm(prompt, json_mode=True)
-        # Parse response
-        # The llm_service's ask_llm might return markdown-wrapped JSON or plain JSON
-        import re
-        raw = re.sub(r"^```(?:json)?", "", raw_response, flags=re.MULTILINE).strip()
-        raw = re.sub(r"```$", "", raw, flags=re.MULTILINE).strip()
-        
-        result = json.loads(raw)
-        answer = result.get("answer", "I could not generate an answer.")
-        sources_used_ids = set(result.get("sources_used", []))
-        follow_up_questions = _normalize_follow_ups(result.get("follow_up_questions", []), language)
-        
-        # Filter docs to only those used
-        used_docs = [doc for doc in docs if doc['chunk_id'] in sources_used_ids]
-        if not used_docs:
-            used_docs = docs  # Fallback: if LLM failed to specify, return all retrieved docs
+    # --- Step 6: Handle empty answer ---
+    if not answer:
+        logger.warning("[Chat] Empty answer from LLM — returning fallback.")
+        answer = (
+            "மன்னிக்கவும், பதில் உருவாக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்."
+            if language == "ta-IN"
+            else "I was unable to generate a response. Please try again."
+        )
 
-        if "not available" in answer.lower() or "do not have" in answer.lower():
-            used_docs = []
+    # --- Step 7: Filter docs to sources actually used ---
+    if sources_used_ids:
+        used_docs = [doc for doc in rag_chunks if doc.get("chunk_id") in sources_used_ids]
+    else:
+        used_docs = rag_chunks  # fallback: return all retrieved
 
-        return answer, used_docs, follow_up_questions
-    except Exception as exc:
-        logger.error(f"[Chat Service] Failed to process query: {exc}")
-        return "An error occurred while generating the response.", [], _default_follow_ups(language)
+    # Hide docs if answer says "not available"
+    if any(phrase in answer.lower() for phrase in ["not available", "do not have", "cannot find"]):
+        used_docs = []
+
+    # --- Step 8: Persist memory ---
+    if memory_enabled:
+        rag_chunk_ids = [doc.get("chunk_id", "") for doc in rag_chunks if doc.get("chunk_id")]
+        topic = _extract_medical_topic(query)
+
+        append_turn(conversation, query, answer, rag_chunk_ids=rag_chunk_ids)
+        conversation["language"] = language
+        if metadata:
+            conversation["ai_context"].update(metadata)
+        if topic:
+            conversation["last_medical_topic"] = topic
+
+        saved = save_conversation(
+            conv_id,
+            user_id,
+            conversation.get("messages", []),
+            rag_chunks_used=rag_chunk_ids,
+            language=language,
+            ai_context=conversation.get("ai_context", {}),
+            last_medical_topic=conversation.get("last_medical_topic", ""),
+        )
+        logger.debug("[Chat] Conversation persisted | id=%s | saved=%s", conv_id, saved)
+
+    # --- Step 9: Normalize follow-ups ---
+    follow_up_questions = _normalize_follow_ups(follow_up_raw, language)
+
+    logger.info(
+        "[Chat] Response ready | answer_len=%d | docs=%d | follow_ups=%d",
+        len(answer), len(used_docs), len(follow_up_questions),
+    )
+
+    return answer, used_docs, follow_up_questions
+
+
+# ---------------------------------------------------------------------------
+# Internal constant
+# ---------------------------------------------------------------------------
+_MAX_LEGACY_HISTORY = 8  # max legacy short-term history turns to include

@@ -521,9 +521,6 @@ def verify_otp_route():
             return _finalize_session_login("admin", account.get("email", mobile), account, "admin.dashboard")
 
         if role == "officer":
-            if needs_verification(account):
-                logger.info("[LOOP PREVENTION] Verification required once for officer | identifier=%s", mobile)
-                return _start_identity_verification(mobile, "officer")
             _clear_identity_verification_state()
             _clear_authenticated_identity()
             _create_officer_session(account, mobile)
@@ -533,16 +530,13 @@ def verify_otp_route():
             return _finalize_session_login("officer", mobile, account, "officer.dashboard")
 
         employee = account if account.get("is_government_employee") else get_employee_by_mobile(mobile)
-        if employee or account.get("is_government_employee"):
-            _clear_authenticated_identity()
-            session["mobile"] = mobile
-            session["user_id"] = _government_identity_id(employee, mobile)
-            session["role"] = role
-            flash("Logged in successfully!", "success")
-            logger.info("[AUTH] User login success | mobile=%s", mobile)
-            return _finalize_session_login("user", mobile, employee or account, "user.dashboard")
-
-        return _start_identity_verification(mobile, role)
+        _clear_authenticated_identity()
+        session["mobile"] = mobile
+        session["user_id"] = _government_identity_id(employee, mobile) if employee else mobile
+        session["role"] = role
+        flash("Logged in successfully!", "success")
+        logger.info("[AUTH] User login success | mobile=%s", mobile)
+        return _finalize_session_login("user", mobile, employee or account, "user.dashboard")
 
     flash(message, "danger")
     return render_template("otp_verify.html", mobile=mobile)
@@ -673,20 +667,16 @@ def login_submit():
 
     if role == "officer":
         officer = auth_result.get("document") or {}
-        if needs_verification(officer):
-            return _start_identity_verification(identifier, "officer")
         _create_officer_session(officer, identifier)
         return _finalize_session_login("officer", identifier, officer, "officer.dashboard")
 
     user = auth_result.get("document") or {}
     employee = auth_result.get("employee") or (user if user.get("is_government_employee") else get_employee_by_mobile(identifier))
-    if employee or user.get("is_government_employee"):
-        session["mobile"] = _normalize_mobile(identifier)
-        session["user_id"] = employee.get("employee_id") if employee else _normalize_mobile(identifier)
-        session["role"] = "user"
-        return _finalize_session_login("user", identifier, employee or user, "user.dashboard")
-
-    return _start_identity_verification(identifier, "user")
+    normalized_id = _normalize_mobile(identifier) or identifier
+    session["mobile"] = user.get("mobile") or user.get("auth", {}).get("phone") or normalized_id
+    session["user_id"] = employee.get("employee_id") if employee else normalized_id
+    session["role"] = "user"
+    return _finalize_session_login("user", identifier, employee or user, "user.dashboard")
 
 @auth_bp.route("/forgot_password")
 def forgot_password():
