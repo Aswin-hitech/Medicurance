@@ -8,6 +8,12 @@
 # ===============================
 # Python
 # ===============================
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+node_modules/
 __pycache__/
 *.py[cod]
 *.pyo
