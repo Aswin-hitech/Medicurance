@@ -11,8 +11,10 @@ from datetime import timedelta
 from utils.rate_limiter import limiter
 from utils.logger import logger
 from utils.exceptions import register_error_handlers
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 app.secret_key = Config.SECRET_KEY
 
 # Fail fast on missing runtime configuration before the app wires routes.
